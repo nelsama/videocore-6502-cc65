@@ -1,0 +1,5 @@
+-Isrc
+-Iexamples/demo/include
+-Iexamples/collision/include
+-Iexamples/animation/include
+-Iexamples/palette/include

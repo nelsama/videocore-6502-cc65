@@ -1,0 +1,18 @@
+# Artefactos de compilacion
+build/
+output/
+*.o
+*.lib
+*.bin
+*.map
+
+# Editor / sistema
+.DS_Store
+*.swp
+
+# Fuentes copiadas para generar el PDF (docs/md2pdf.py las recrea)
+docs/_body.ttf
+docs/_mono.ttf
+
+# PDF generado (docs/md2pdf.py lo recrea)
+docs/*.pdf
