@@ -17,6 +17,12 @@ solo el registro de cambios.
 
 ### Añadido
 
+- **Guía de conceptos (`docs/CONCEPTOS-JUEGO.md`).** Documento introductorio para quien
+  sabe 6502 pero no conoce los gráficos de 8 bits: tile, patrón, tilemap, atributos,
+  sprite, OAM, scroll, bandas (split de raster), paletas, VBLANK, colisiones, modo
+  texto y el esqueleto de un juego. Enlazado desde el `README.md`. `VIDEO-LIB.md` queda
+  como referencia de API.
+
 - **Color de fondo global (`BG_COLOR`).** El manual del core lo define como la entrada
   15 del banco de fondo, sin registro propio; hasta ahora solo se podía tocar de forma
   indirecta (`vc_pal_set_bg(3, 3, ...)`). Nuevo helper dedicado:

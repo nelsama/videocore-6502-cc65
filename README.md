@@ -119,10 +119,18 @@ Hay cuatro ejemplos en `examples/`, cada uno con su propio makefile:
 
 ## Documentación
 
+**¿Nuevo en gráficos de 8 bits?** Empieza por
+[`docs/CONCEPTOS-JUEGO.md`](docs/CONCEPTOS-JUEGO.md): explica qué es un tile, un
+sprite, el tilemap, la OAM, el scroll, las bandas, el VBLANK, las paletas y cómo se
+arma un juego, sin asumir experiencia previa en juegos de 8 bits.
+
 La referencia completa de la API está en
 [`docs/VIDEO-LIB.md`](docs/VIDEO-LIB.md): sincronización, limpieza de VRAM,
 fondo, sprites, colisión, scroll, texto, entrada por UART y la convención de
 llamada cc65 para el núcleo en ensamblador.
+
+El comportamiento del hardware (registros, direcciones, límites) está en el
+[manual del core](docs/07-MANUAL-PROGRAMACION.md).
 
 El historial de cambios y correcciones está en [`docs/CHANGELOG.md`](docs/CHANGELOG.md).
 
