@@ -303,6 +303,7 @@ variaciones sobre este esqueleto.
 | **Scroll** | desplazar la ventana sobre el mapa, en píxeles |
 | **Banda / split de raster** | dividir la pantalla en zonas con scroll independiente (HUD fijo) |
 | **VBLANK** | intervalo entre frames en que es seguro escribir VRAM/OAM |
+| **Setup de VRAM** | limpieza de toda la VRAM (+ recarga de la fuente) hecha por el hardware, sin recorrer celdas |
 | **COLL_POINT** | píxel del sprite que el hardware comprueba contra el fondo sólido |
 | **OVERFLOW** | flag: hubo más de 8 sprites en una línea y se descartaron algunos |
 | **Overscan** | el monitor recorta los bordes; las filas extremas pueden no verse |

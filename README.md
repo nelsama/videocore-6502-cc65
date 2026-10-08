@@ -4,12 +4,12 @@ Librería en **C** con núcleo optimizado en **ensamblador** para programar jueg
 sobre el Core de Vídeo de un computador 6502 (Sipeed Tang Nano 9K / Gowin GW1NR-9).
 
 Cubre todas las capacidades del core: **tiles + tilemap, sprites (OAM), scroll,
-split de raster (bandas/HUD), modo texto, colisión sprite↔tile y paletas
-programables** (incluido el color de fondo global).
+split de raster (bandas/HUD), modo texto, colisión sprite↔tile, paletas
+programables** (incluido el color de fondo global) y **setup de VRAM por hardware**.
 
 > **Referencia de hardware:** el comportamiento del core (registros, semántica,
 paletas, límites) se documenta en el *Manual de Programación del Core de Vídeo*,
-(v2.7, hardware `6502_board_v3`), incluido en este repositorio como
+(v2.8, hardware `6502_board_v3`), incluido en este repositorio como
 [`docs/07-MANUAL-PROGRAMACION.md`](docs/07-MANUAL-PROGRAMACION.md). La librería
 lo refleja y encapsula; no se necesita conocer el VHDL.
 
@@ -89,7 +89,7 @@ make CC65_HOME=C:/ruta/a/cc65
 int main(void) {
     vc_wait_ready();          /* 1. esperar inicialización de VRAM */
     vc_wait_vblank();
-    vc_clear_vram();          /* 2. limpiar tilemap + atributos + OAM */
+    vc_clear_vram();          /* 2. limpiar VRAM (setup por hardware) */
 
     while (1) {
         vc_wait_vblank();     /* 3. actualizar SOLO en VBLANK */

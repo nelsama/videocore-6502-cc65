@@ -25,6 +25,8 @@
         .export _vc_wait_vblank
         .export _vc_wait_vblank_end
         .export _vc_status
+        .export _vc_setup_busy
+        .export _vc_wait_setup
         .export _vc_write
         .export _vc_put_cell
         .export _vc_put_attr
@@ -105,6 +107,8 @@ VID_BAND3_Y_HI  = $F012
 VID_PAL_PTR     = $F013
 VID_PAL_LO      = $F014
 VID_PAL_HI      = $F015
+VID_SETUP       = $F016
+VID_SETUP_ST    = $F017
 .else
 VID_ADDR_LO     = $D800
 VID_ADDR_HI     = $D801
@@ -127,6 +131,8 @@ VID_BAND3_Y_HI  = $D812
 VID_PAL_PTR     = $D813
 VID_PAL_LO      = $D814
 VID_PAL_HI      = $D815
+VID_SETUP       = $D816
+VID_SETUP_ST    = $D817
 .endif
 
 ; --- Áreas del puerto indirecto ---
@@ -151,6 +157,9 @@ VC_SPR_XBIT8   = $04          ; bit 8 de la coordenada X
 ; --- Bits de status ---
 ST_VBLANK      = $80
 ST_READY       = $10
+
+; --- Bit de estado del setup ($D817) ---
+ST_SETUP_BUSY  = $01
 
 ; --- Tamaño del tilemap/atributos ---
 MAP_BYTES_HI   = 8              ; 8 * 256 = 2048
@@ -186,6 +195,26 @@ _vc_wait_vblank_end:
 _vc_status:
         lda VID_STATUS
         ldx #0
+        rts
+
+; ----------------------------------------------------------------------------
+; uint8_t vc_setup_busy(void)
+;   1 si hay un setup de VRAM en curso (BIT0 de $D817).
+; ----------------------------------------------------------------------------
+_vc_setup_busy:
+        lda VID_SETUP_ST
+        and #ST_SETUP_BUSY
+        ldx #0
+        rts
+
+; ----------------------------------------------------------------------------
+; void vc_wait_setup(void)
+;   Espera a que termine el setup de VRAM (BUSY=0).
+; ----------------------------------------------------------------------------
+_vc_wait_setup:
+        lda VID_SETUP_ST
+        and #ST_SETUP_BUSY
+        bne _vc_wait_setup
         rts
 
 ; ----------------------------------------------------------------------------

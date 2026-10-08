@@ -17,23 +17,36 @@
  * LIMPIEZA DE VRAM
  * =========================================================================== */
 
-/* Limpia la VRAM de trabajo: tilemap a tile 0 (vacio), atributos a 0 y el OAM
- * deshabilitado.
+/* Limpia la VRAM usando el SETUP POR HARDWARE del core ($D816/$D817).
  *
- * NO limpia los patrones de fondo ni de sprite: el manual v2.1 confirma que la
- * fuente de texto ocupa los patrones $20-$7F y el hardware los deja cargados al
- * arrancar. Un "clear de patrones" borraria la fuente y el texto dejaria de
- * verse.
+ * El core limpia en hardware, en ~120-275 us:
+ *   - tilemap completo (2048 celdas -> tile 0)
+ *   - atributos a 0
+ *   - patrones de fondo y de sprite escribibles
+ *   - RE-EXPANDE la fuente de texto (glifos $20-$7F desde la ROM de fuente)
  *
- * Nota: tras VIDEO_READY, el hardware ya deja el tilemap a $20 (espacio) y los
- * atributos a 0. Si vas a sobrescribir todo el mundo igualmente, puedes omitir
- * las partes que no necesites.
+ * Por eso, a diferencia de la version manual antigua, este clear SI reescribe
+ * los patrones: los borra y vuelve a cargar la fuente, de modo que el texto
+ * sigue disponible despues de limpiar. Si el juego habia dibujado sus propios
+ * tiles en el rango de la fuente ($20-$7F), SE PERDERAN.
  *
- * Debe llamarse tras vc_wait_ready() y dentro del VBLANK. */
+ * El tile 0 queda apuntando a un patron en blanco (transparente), asi que la
+ * pantalla se ve del color de fondo (BG_COLOR).
+ *
+ * OJO: mientras el setup corre (BUSY=1), las escrituras del CPU a VRAM/OAM se
+ * IGNORAN. Por eso esta funcion ESPERA a que termine antes de retornar, para
+ * que puedas escribir tu mundo justo despues. No toca paletas, scroll ni
+ * bandas.
+ *
+ * El OAM (posiciones de sprite) NO lo limpia el setup; vc_clear_vram() deshabilita
+ * los 32 sprites a continuacion, para que no queden dibujando tras borrar sus
+ * patrones.
+ *
+ * Debe llamarse tras vc_wait_ready() y dentro del VBLANK (evita rasgado). */
 void vc_clear_vram(void) {
-    vc_fill_tilemap(VC_TILE_BLANK);   /* todas las celdas -> tile 0 */
-    vc_clear_attr();                  /* atributos a 0 (paleta 0, sin flags) */
-    vc_clear_oam();                   /* todos los sprites deshabilitados */
+    VID_SETUP = 1;      /* dispara el setup por hardware */
+    vc_wait_setup();    /* espera a BUSY=0 -> la VRAM ya esta lista */
+    vc_clear_oam();     /* deshabilita los 32 sprites */
 }
 
 /* ===========================================================================

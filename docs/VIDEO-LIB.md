@@ -7,7 +7,7 @@ split de raster, modo texto, colisión sprite↔tile y paletas programables.
 
 > **Referencia de hardware:** el comportamiento del core (registros, semántica,
 > paletas, límites) se documenta en el *Manual de Programación del Core de Vídeo*
-> (v2.7, hardware `6502_board_v3`), incluido en este repositorio como
+> (v2.8, hardware `6502_board_v3`), incluido en este repositorio como
 > [`07-MANUAL-PROGRAMACION.md`](07-MANUAL-PROGRAMACION.md). Esta librería lo refleja
 > y encapsula su API; no se necesita conocer el VHDL del core.
 
@@ -78,7 +78,7 @@ int main(void) {
     vc_wait_ready();          /* 1. esperar inicialización de VRAM */
     vc_wait_vblank();
 
-    vc_clear_vram();          /* 2. limpiar tilemap + atributos + OAM */
+    vc_clear_vram();          /* 2. limpiar VRAM (setup por hardware) */
     vc_put_str(2, 2, "HOLA MUNDO");
 
     while (1) {
@@ -111,6 +111,8 @@ ld65 -C config/programa.cfg -o output/prog.bin build/prog.o output/vc.lib \
 | `vc_wait_vblank()` | Espera a **entrar** en VBLANK |
 | `vc_wait_vblank_end()` | Espera a **salir** de VBLANK |
 | `vc_status()` | Lee `$D803` (bits `VC_STATUS_*`) |
+| `vc_setup_busy()` | 1 si hay un **setup de VRAM** en curso (`$D817` bit0 `BUSY`) |
+| `vc_wait_setup()` | Espera a que termine el setup de VRAM (`BUSY=0`) |
 
 ### Limpieza de VRAM (recomendado al arrancar)
 
@@ -119,22 +121,32 @@ Tras `VIDEO_READY`, la VRAM ya viene inicializada por el hardware (**tilemap a
 tu propio mundo, limpia para partir de un estado conocido:
 
 ```c
-vc_clear_vram();   /* tilemap a tile 0 + atributos a 0 + OAM deshabilitado */
+vc_clear_vram();   /* setup por hardware: limpia VRAM + recarga la fuente */
 ```
 
-> ⚠️ `vc_clear_vram()` **NO** toca los patrones de tiles: la fuente de texto
-> ocupa `$20-$7F` y un "clear de patrones" **la borraría**. Por eso existen
-> `vc_clear_bg_patterns()`/`vc_clear_spr_patterns()` por separado, y solo debes
-> llamarlas si vas a reemplazar **todo** el tileset sin usar texto.
+`vc_clear_vram()` usa el **setup de VRAM por hardware** del core (`$D816`/`$D817`),
+la misma máquina que inicializa la VRAM al arrancar. Limpia tilemap y atributos,
+borra los patrones de fondo y de sprite, **vuelve a expandir la fuente de texto**
+y deshabilita los 32 sprites. Todo en **~120-275 µs** (en vez del bucle celda a
+celda, que tardaría ~ms). Es la forma recomendada de **cambiar de escena**.
 
-Funciones individuales:
+> ⚠️ **`vc_clear_vram()` borra los patrones** (los de fondo y los de sprite). El
+> setup **recarga la fuente** `$20-$7F` automáticamente, así que el texto sigue
+> disponible tras limpiar. **Pero si habías dibujado tus propios tiles en
+> `$20-$7F`, se pierden** (ese rango siempre vuelve a ser la fuente).
+>
+> Mientras el setup corre (`BUSY=1`), las **escrituras del CPU a VRAM/OAM se
+> ignoran**; `vc_clear_vram()` **espera a que termine** antes de retornar, así que
+> puedes dibujar tu mundo justo después.
+
+Funciones individuales (no usan el setup; control fino):
 
 | Función | Descripción |
 |---------|-------------|
-| `vc_clear_vram()` | tilemap a 0 + atributos a 0 + OAM apagado (sin tocar patrones) |
+| `vc_clear_vram()` | Setup HW: limpia tilemap+attrs+patrones, recarga fuente, OAM off |
 | `vc_fill_tilemap(tile)` | Rellena las 2048 celdas del tilemap con `tile` |
 | `vc_clear_attr()` | Atributos a 0 (paleta 0, sin flags) |
-| `vc_clear_bg_patterns()` | Los 256 patrones de fondo a 0 ⚠️ borra la fuente |
+| `vc_clear_bg_patterns()` | Los 256 patrones de fondo a 0 ⚠️ borra la fuente (recuperable con `vc_clear_vram()`) |
 | `vc_clear_spr_patterns()` | El banco de patrones de sprite a 0 |
 | `vc_clear_oam()` | Deshabilita los 32 sprites |
 
@@ -142,7 +154,8 @@ Funciones individuales:
 > **después** de limpiar.
 
 > **Regla de oro:** mueve sprites, escribe OAM/VRAM y scroll **durante el
-> VBLANK**, o verás sprites "partidos" a mitad de frame.
+> VBLANK**, o verás sprites "partidos" a mitad de frame. Dispara el setup de
+> VRAM en VBLANK para evitar el rasgado de ~1 frame mientras limpia.
 
 ### Escritura a VRAM (puerto indirecto)
 
@@ -286,10 +299,11 @@ vc_set_bgcolor(VC_BG_COLOR_DEFAULT); /* volver al azul cielo por defecto ($48C) 
 ```
 
 > ⚠️ La entrada 15 se comparte con el **color 3 de la paleta 3** del fondo: cambiar
-> `BG_COLOR` también cambia los tiles que usen "paleta 3, color 3" (manual §4.3).
+> `BG_COLOR` también cambia los tiles que usen "paleta 3, color 3".
 >
 > Los **sprites NO se ven afectados**: usan un banco de paleta aparte (entradas
-> 16-31), así que su color 3 (entradas 19/23/27/31) es independiente de `BG_COLOR`.
+> 16-31, manual §4.2), así que su color 3 (entradas 19/23/27/31) es independiente
+> de `BG_COLOR`.
 
 > ⚠️ **Escribe las paletas en VBLANK** si cambias muchos colores a la vez: el motor
 > aplica el color al vuelo, y hacerlo a mitad de frame puede mostrar una franja con
@@ -508,6 +522,7 @@ orienta a quien busque el código de cada función:
 | Función | Archivo | Motivo |
 |---------|---------|--------|
 | `vc_wait_ready/vblank/vblank_end`, `vc_status` | `video.s` | Espera en bucle (rápido) |
+| `vc_setup_busy`, `vc_wait_setup` | `video.s` | Polling del setup de VRAM |
 | `vc_write`, `vc_put_cell`, `vc_put_attr` | `video.s` | Puerto indirecto (caliente) |
 | `vc_load_bg_pattern`, `vc_load_spr_pattern` | `video.s` | Carga de gráficos |
 | `vc_oam_put`, `vc_sprite_move`, `vc_sprite_set`, `vc_sprite16_set` | `video.s` | Sprites (cada frame) |
@@ -519,6 +534,9 @@ orienta a quien busque el código de cada función:
 | `vc_set_cell_attr`, `vc_free_cell`, `vc_sprite_disable` | `gfx.c` | Helpers triviales |
 | `vc_pal_set_bg/spr`, `vc_pal_load_bg/spr` | `gfx.c` | Helpers de paleta por (pal,color) |
 | `vc_solid_hit`, `vc_box_from_sprite`, `vc_load_tiles`, `vc_blit_screen` | `gfx.c` | Orquestación |
+
+> `vc_clear_vram()` dispara el **setup de VRAM por hardware** (`$D816`) y espera a
+> que termine; el trabajo pesado lo hace el core, no el CPU.
 
 **Regla:** si se llama una vez por frame por objeto (sprites, colisiones, puerto
 indirecto), está en asm. Si es arranque o helpers, está en C.
@@ -646,6 +664,10 @@ vc_pal_ptr(entrada)  vc_pal_set(entrada,rgb444)  vc_pal_load(entrada,arr,count)
 vc_pal_set_bg/spr(pal,color,rgb444)  vc_pal_load_bg/spr(pal,arr4)
 vc_set_bgcolor(rgb444)          /* color de fondo global (BG_COLOR) */
 
+/* Setup de VRAM por hardware ($D816/$D817) */
+vc_setup_busy()  vc_wait_setup()
+VC_SETUP_BUSY (0x01)
+
 /* Flags de sprite */
 VC_SPR_FLIP_Y  VC_SPR_FLIP_X  VC_SPR_PRIO  VC_SPR_SCALE2X  VC_SPR_XBIT8
 
@@ -694,5 +716,8 @@ texto y colisiones. Úsala como plantilla. El resto de ejemplos
 - La VRAM es **solo de escritura**: mantén tu propia copia del texto/mapa en RAM.
 - Colisión sprite↔sprite: **software** (`vc_box_overlap`/`vc_box_contains`).
 - Colisión sprite↔tile: flag **global** (`vc_solid_hit`); el software decide quién.
+- **`vc_clear_vram()` borra los patrones** (y recarga la fuente `$20-$7F`). Si el
+  juego dibuja tiles propios en ese rango, los pierde; usa `$00-$1F` y `$80-$FF`
+  para gráficos si necesitas texto.
 - La fila 0 del tilemap se ve desplazada por el pipeline: resérvala para HUD y
   dibuja desde la fila 1.

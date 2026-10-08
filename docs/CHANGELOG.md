@@ -10,12 +10,18 @@ solo el registro de cambios.
 
 ## [Sin publicar]
 
-> **Alineado con:** Manual de Programación del Core de Vídeo **v2.7**
-> (hardware de referencia `6502_board_v3`). Ver
+> **Alineado con:** Manual de Programación del Core de Vídeo **v2.8**
+> (hardware de referencia `6502_board_v3`, con **setup de VRAM por hardware**). Ver
 > [`07-MANUAL-PROGRAMACION.md`](07-MANUAL-PROGRAMACION.md). Al recompilar el core,
 > revisa esa versión antes de dar por buena esta de la librería.
 
 ### Añadido
+
+- **Setup de VRAM por hardware (`$D816`/`$D817`).** El core puede limpiar la VRAM y
+  recargar la fuente en hardware (~120-275 µs). Nuevas funciones:
+  - `vc_setup_busy()` — 1 si el setup está en curso (`BUSY`).
+  - `vc_wait_setup()` — espera a que termine el setup.
+  - Macros `VID_SETUP` / `VID_SETUP_ST` y constante `VC_SETUP_BUSY` en `video.h`.
 
 - **Guía de conceptos (`docs/CONCEPTOS-JUEGO.md`).** Documento introductorio para quien
   sabe 6502 pero no conoce los gráficos de 8 bits: tile, patrón, tilemap, atributos,
@@ -34,6 +40,18 @@ solo el registro de cambios.
 
 ### Cambiado
 
+- **`vc_clear_vram()` usa ahora el setup de VRAM por hardware.** Antes recorría las
+  2048 celdas del tilemap desde el CPU (~ms); ahora dispara el setup del core
+  (`$D816`) y espera a que termine (~120-275 µs). **Cambio de comportamiento:**
+  - Además de tilemap/atributos/OAM, ahora **borra los patrones** de fondo y de sprite;
+    el setup **recarga la fuente de texto** (`$20-$7F`) automáticamente.
+  - Si el juego había dibujado tiles propios en `$20-$7F`, **se pierden** (ese rango
+    vuelve a ser la fuente).
+  - Mientras corre el setup, las escrituras de CPU a VRAM/OAM se ignoran;
+    `vc_clear_vram()` espera a que acabe antes de retornar.
+  - Los cuatro ejemplos actualizados; sus comentarios ya no asumen que los patrones
+    sobreviven al clear.
+
 - **Constantes de paleta renombradas a índices neutros (cambio incompatible).** Los
   nombres anteriores describían el color *por defecto* de cada paleta, lo que engañaba
   ahora que las paletas son reprogramables (`$D813-$D815`). Renombrados:
@@ -49,7 +67,7 @@ solo el registro de cambios.
 
 ### Corregido
 
-- **Documentación alineada con el manual v2.7 (`6502_board_v3`).**
+- **Documentación alineada con el manual del core (`6502_board_v3`).**
   - `README.md`: corregido el árbol de `examples/` (`palette/` estaba mal anidado) y
     actualizada la cabecera (plataforma Tang Nano 9K / Gowin GW1NR-9, mención a
     paletas programables).
@@ -58,8 +76,8 @@ solo el registro de cambios.
     (`docs/07-MANUAL-PROGRAMACION.md`); añadidos `vc_set_bgcolor`, `VC_PAL_BGCOLOR`
     y `VC_BG_COLOR_DEFAULT` a la referencia rápida; añadido `src/collide.s` a la
     tabla de archivos.
-  - Manual §4.3 y `VIDEO-LIB.md`: aclarado que el banco de paleta de **sprite** es
-    aparte (16-31), por lo que `BG_COLOR` (entrada 15) **no** afecta a los sprites.
+  - `docs/VIDEO-LIB.md`: aclarado que el banco de paleta de **sprite** es aparte
+    (16-31, manual §4.2), por lo que `BG_COLOR` (entrada 15) **no** afecta a los sprites.
 
 - **`vc_oam_put` escribía el índice del sprite en vez del dato.**
   `vc_oam_put(spr, field, data)` guardaba `data` en `VC_TILE`, pero los dos `popa`

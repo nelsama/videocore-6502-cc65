@@ -28,7 +28,7 @@
 static const uint8_t tile_p0[8] = {0xFF,0x81,0x81,0x81,0x81,0x81,0x81,0xFF};
 static const uint8_t tile_p1[8] = {0x00,0x7E,0x7E,0x7E,0x7E,0x7E,0x7E,0x00};
 
-/* --- Tile vacio (color 0 = transparente): evita ver basura del arranque --- */
+/* --- Tile vacio (color 0 = transparente): fondo limpio del color de BG --- */
 static const uint8_t tile_empty_p0[8] = {0,0,0,0,0,0,0,0};
 static const uint8_t tile_empty_p1[8] = {0,0,0,0,0,0,0,0};
 
@@ -92,8 +92,8 @@ static void setup_video(void) {
     vc_clear_vram();
 
     /* Patrones de fondo: 0 = vacio (transparente), 1 = bloque de prueba.
-     * Cargar el 0 es IMPRESCINDIBLE: si no, el fondo vacio muestra el
-     * patron 0, que trae basura del arranque. */
+     * Tras vc_clear_vram() (setup por hardware) el patron 0 ya queda en blanco,
+     * pero lo cargamos explicitamente para no depender de eso. */
     vc_load_bg_pattern(0, tile_empty_p0, tile_empty_p1);
     vc_load_bg_pattern(1, tile_p0, tile_p1);
 

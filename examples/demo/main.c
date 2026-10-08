@@ -127,7 +127,8 @@ static uint8_t  hit;         /* parpadeo al colisionar */
  * =========================================================================== */
 
 static void load_assets(void) {
-    /* Tile vacio primero: garantiza que el fondo "vacio" sea transparente */
+    /* Tile vacio primero: el fondo "vacio" debe ser transparente (patron 0 en
+     * blanco). vc_clear_vram() ya lo deja asi; lo recargamos por claridad. */
     vc_load_bg_pattern(TILE_EMPTY, tile_blank_p0, tile_blank_p1);
 
     /* Tileset de fondo (formatos planares) */
@@ -341,7 +342,7 @@ int main(void) {
     vc_wait_ready();                 /* VRAM lista antes de tocar nada */
     vc_wait_vblank();
 
-    vc_clear_vram();                 /* borra la basura inicial de la VRAM */
+    vc_clear_vram();                 /* setup HW: limpia VRAM y recarga la fuente */
 
     /* Fija el color de fondo global (BG_COLOR) al azul por defecto: el fondo
      * vacio (color 0) es transparente y deja ver BG_COLOR. */

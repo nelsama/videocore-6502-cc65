@@ -75,7 +75,8 @@ static void setup_video(void) {
     vc_wait_ready();
     vc_wait_vblank();
     vc_clear_vram();
-    vc_clear_spr_patterns();   /* limpia los 64 patrones de sprite (quita basura) */
+    vc_clear_spr_patterns();   /* redundante tras el setup de vc_clear_vram,
+                                * pero explicito por seguridad */
 
     /* Fija el color de fondo global (BG_COLOR) al azul por defecto: el fondo
      * vacio (color 0) es transparente y deja ver BG_COLOR. */

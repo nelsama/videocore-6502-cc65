@@ -67,8 +67,8 @@ Pulsa **`q`** por el terminal UART para salir al monitor.
 ## Notas de diseño
 
 - **Carga el patrón del tile 0 como vacío** (`tile_empty_p0/p1`): `vc_clear_vram()`
-  limpia el tilemap a tile 0, pero **no** los patrones. Si no cargas el patrón 0, el
-  fondo vacío muestra la basura del arranque.
+  ya deja el patrón 0 en blanco (su setup por hardware limpia los patrones), pero
+  el ejemplo lo recarga explícitamente para no depender de ese detalle.
 - **Evita que el sprite use el mismo color que el `BG_COLOR`** (azul cielo): un
   rombo azul sobre fondo azul se camufla y parece desaparecer. El ejemplo usa solo
   colores cálidos (rojo/magenta/naranja/amarillo) para el sprite.
