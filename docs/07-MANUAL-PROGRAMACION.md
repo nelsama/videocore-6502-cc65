@@ -9,9 +9,9 @@
 > **caja negra** (registros y memoria). No necesitas conocer cómo está hecho por
 > dentro. Los ejemplos están en ensamblador (ca65 / cc65).
 
-**Versión del manual:** 2.7
+**Versión del manual:** 2.8
 **Hardware de referencia:** `6502_board_v3` (módulo de vídeo cerrado: tiles + sprites
-+ texto + scroll + split de raster + colisión sprite↔tile).
++ texto + scroll + split de raster + colisión sprite↔tile + setup de VRAM por hardware).
 Si recompilas el hardware, anota aquí la versión del manual correspondiente.
 
 ---
@@ -92,6 +92,8 @@ para memoria, y **registros directos** para scroll/status/bandas.
 | `$D813` | `PAL_PTR` | W | Puntero de paleta (0-15 fondo, 16-31 sprite). Ver §4.4 |
 | `$D814` | `PAL_LO` | W | Color de paleta, bits 7:0 (RGB444) |
 | `$D815` | `PAL_HI` | W | Color de paleta, bits 11:8 → **escribe la entrada y auto-incrementa `PAL_PTR`** |
+| `$D816` | `SETUP` | W | **Dispara el setup de hardware** (limpiar VRAM + re-expandir fuente). Ver §11.3 |
+| `$D817` | `SETUP_ST` | R | Estado del setup: bit0 = BUSY, bit4 = VIDEO_READY. Ver §11.3 |
 
 ### 2.2 Encoding de `$D801` (área + dirección alta)
 
@@ -292,11 +294,6 @@ propio: se cambia escribiendo esa entrada con el puerto de paleta:
   use "paleta 3, color 3" se pintará con el **mismo color que BG_COLOR** (y cambiará
   junto con él). Es decir: **sí puedes usarla en tiles**, pero su color es **el del
   fondo**, no uno independiente.
-
-  > ⚠️ **Los sprites no se ven afectados.** Las paletas de sprite son un **banco
-  > aparte** (entradas 16-31), así que un sprite con "paleta X, color 3" usa la
-  > entrada `16 + X*4 + 3` (19/23/27/31), nunca la 15. Cambiar `BG_COLOR` **no**
-  > altera ningún color de sprite.
 
   > **Truco útil:** como el color 15 siempre coincide con el fondo, un tile puede
   > usarlo como "fondo opaco del color de BG": a diferencia del **color 0** (que es
@@ -1110,6 +1107,71 @@ wait_vb_end:
 > Escribir el OAM a mitad del frame visible **parte el sprite** (unas líneas con
 > el valor viejo y otras con el nuevo). Hazlo siempre en VBLANK.
 
+### 11.3 Setup de vídeo por hardware (`$D816` / `$D817`)
+
+El core puede **limpiar la VRAM por hardware** y dejar la fuente de texto lista,
+reusando la misma máquina de inicialización que corre al arrancar. Es útil para
+**cambiar de pantalla/escena** sin hacerlo a mano celda por celda desde el CPU.
+
+| Dir | Nombre | R/W | Función |
+|-----|--------|-----|---------|
+| `$D816` | `SETUP` | W | Escribir **cualquier valor** dispara el setup |
+| `$D817` | `SETUP_ST` | R | bit0 = `BUSY`, bit4 = `VIDEO_READY` |
+
+**Qué hace el setup (todo en hardware, ~120-275 µs):**
+1. Limpia el **tilemap** completo (2048 celdas → tile 0).
+2. Limpia los **atributos** (2048 celdas → 0).
+3. Limpia los **patrones de fondo** y de **sprite** escribibles.
+4. **Re-expande la fuente**: vuelve a copiar los glifos desde la ROM de fuente
+   a los patrones `$20-$7F`, así el texto sigue disponible tras limpiar.
+5. **No toca**: RAM, ROM, paletas, scroll, bandas, ni el estado del CPU.
+
+**Mientras el setup corre (`BUSY=1`), las escrituras del CPU a la VRAM/OAM se
+IGNORAN** (no pueden corromperlo). El CPU puede seguir escribiendo scroll y
+paleta con normalidad, o esperar a que termine.
+
+```asm
+; disparar el setup (el CPU no necesita hacer el trabajo)
+    LDA #1
+    STA $D816
+
+; (opcional) esperar a que termine
+wait_setup:
+    LDA $D817
+    AND #$01          ; bit0 = BUSY
+    BNE wait_setup
+    ; aquí la pantalla ya está limpia y el texto re-expandido
+```
+
+**Especificación para la librería (implementación sugerida):**
+
+| Aspecto | Valor |
+|---------|-------|
+| Nombre sugerido | `vc_setup()` (dispara) y `vc_setup_busy()` / `vc_wait_setup()` |
+| Registro disparo | escritura a `$D816`, **cualquier valor** (usar `$01`) |
+| Registro estado | lectura de `$D817`: bit0 = `BUSY`, bit4 = `VIDEO_READY` |
+| Duración | **~120-275 µs** (menos de 0.3 ms, ~1% de un frame) |
+| Bloqueante | no: el CPU da la orden y sigue; opcionalmente espera a `BUSY=0` |
+| Efecto colateral | limpia tilemap/atributos/patrones/sprites y re-expande la fuente |
+| No afectado | RAM, ROM, paletas, scroll, bandas, estado del CPU |
+| Durante `BUSY=1` | escrituras del CPU a `$D800/$D801/$D802` y OAM **ignoradas** |
+
+Recomendaciones para la función:
+- **`vc_setup()`**: solo hace `STA $D816`. No espera (no bloquea).
+- **`vc_setup_wait()`**: dispara y hace polling de `$D817` bit0 hasta que `=0`.
+- Tras el setup, el **tilemap queda todo a 0** (tile 0) y los **patrones de
+  fuente re-expandidos**; el juego redibuja su contenido con `$D800-$D802`.
+- Dispararlo **en VBLANK** evita ver el rasgado de ~1 frame mientras limpia.
+
+> El tile 0 apunta a un patrón en blanco (color 0 = transparente), así que tras
+> el setup la pantalla se ve **del color de fondo** (`BG_COLOR`, §4.3). El juego
+> dibuja encima lo que necesite.
+
+> **Mejor dispararlo en VBLANK** (o justo antes de un `JSR` de limpieza de
+> pantalla): el setup escribe la VRAM mientras corre, y si ocurre a mitad del
+> frame visible la imagen puede verse rasgada durante ~1 frame. Es inocuo, pero
+> el VBLANK lo evita.
+
 **¿Qué se puede escribir fuera de VBLANK?**
 
 | Registro | ¿Fuera de VBLANK? | Nota |
@@ -1118,6 +1180,7 @@ wait_vb_end:
 | `$D804-$D807` (scroll) | ⚠️ Idealmente no | Cambia a mitad de frame = salto de cámara |
 | `$D809-$D812` (bandas/raster) | ⚠️ Idealmente no | Igual; normalmente se fijan una vez al arrancar |
 | `$D808` (`MAP_STRIDE`) | — | Reservado; no escribir |
+| `$D816` (`SETUP`) | ⚠️ Mejor en VBLANK | Limpia la VRAM mientras corre; fuera de VBLANK puede rasgar ~1 frame |
 | `$D803` | solo lectura | `VBLANK`/`VIDEO_READY` combinacionales; `OVERFLOW`/`SOLID_HIT` del frame |
 
 ---
@@ -1223,6 +1286,35 @@ msg:
     .byte "HOLA", 0
 ```
 
+### 12.6 Limpiar la pantalla / cambiar de escena (setup por hardware)
+
+En vez de recorrer 2048 celdas escribiendo `$D802` (lento, ~ms), pedí el setup al
+hardware: limpia toda la VRAM y re-expande la fuente en **~120-275 µs**.
+
+```asm
+; cambiar de escena: limpiar pantalla y dejar el texto disponible
+    ; --- mejor hacerlo en VBLANK ---
+wait_vb:
+    LDA $D803
+    AND #$80
+    BEQ wait_vb            ; espera entrar en VBLANK
+
+    LDA #1
+    STA $D816              ; dispara el setup
+
+    ; (opcional) esperar a que termine (no hace falta: ~0.1 ms)
+wait_setup:
+    LDA $D817
+    AND #$01               ; bit0 = BUSY
+    BNE wait_setup
+
+    ; la pantalla ahora está limpia (color de fondo);
+    ; redibuja tu escena con put_cell / put_char normalmente
+```
+
+> Tras el setup, el **tilemap queda todo a 0** y los **patrones de fuente**
+> re-expandidos. Si querías texto, vuelve a escribirlo (los glifos ya están).
+
 ---
 
 ## 13. Limitaciones y buenas prácticas
@@ -1243,6 +1335,7 @@ msg:
 | Colisión sprite↔tile | flag **global** | no dice qué sprite; deducir por software |
 | COLL_POINT | dx, dy **0-7** | auto-escala a 0-15 si el sprite es 2× |
 | Rotación de sprites | **no hay** | usar sprites pre-rotados |
+| Setup de VRAM (`$D816`) | limpia + re-expande fuente | ~120-275 µs; durante `BUSY` se ignoran escrituras CPU a VRAM/OAM |
 | Overscan del monitor | variable | las filas 0 y 29 pueden recortarse según el monitor |
 
 **Buenas prácticas:**
@@ -1372,6 +1465,15 @@ dir_patron = tile*8 + fila               (patrón de fondo)
 dir_spr    = patron*8 + fila             (patrón de sprite)
 byte_oam   = sprite*5 + campo            (campo 0..4)
 ```
+
+### A.5 Registros sueltos
+
+| Dir | R/W | Uso |
+|-----|-----|-----|
+| `$D803` | R | STATUS del vídeo: VBLANK(7), OVERFLOW(6), SOLID_HIT(5), VIDEO_READY(4) |
+| `$D813/$D814/$D815` | W | Paleta (PTR / LO / HI); HI escribe y `PTR++`. Entrada 15 = `BG_COLOR` |
+| `$D816` | W | **Setup de VRAM** (escribir cualquier valor lo dispara) |
+| `$D817` | R | Estado del setup: BUSY(0), VIDEO_READY(4) |
 
 ---
 
