@@ -18,9 +18,8 @@ solo el registro de cambios.
 ### Añadido
 
 - **Setup de VRAM por hardware (`$D816`/`$D817`).** El core puede limpiar la VRAM y
-  recargar la fuente en hardware (~120-275 µs). Nuevas funciones:
-  - `vc_setup_busy()` — 1 si el setup está en curso (`BUSY`).
-  - `vc_wait_setup()` — espera a que termine el setup.
+  recargar la fuente en hardware (~120-275 µs). Nueva función:
+  - `vc_wait_setup()` — espera a que termine el setup (`BUSY=0`).
   - Macros `VID_SETUP` / `VID_SETUP_ST` y constante `VC_SETUP_BUSY` en `video.h`.
 
 - **Guía de conceptos (`docs/CONCEPTOS-JUEGO.md`).** Documento introductorio para quien

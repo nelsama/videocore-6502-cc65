@@ -25,7 +25,6 @@
         .export _vc_wait_vblank
         .export _vc_wait_vblank_end
         .export _vc_status
-        .export _vc_setup_busy
         .export _vc_wait_setup
         .export _vc_write
         .export _vc_put_cell
@@ -194,16 +193,6 @@ _vc_wait_vblank_end:
 ; ----------------------------------------------------------------------------
 _vc_status:
         lda VID_STATUS
-        ldx #0
-        rts
-
-; ----------------------------------------------------------------------------
-; uint8_t vc_setup_busy(void)
-;   1 si hay un setup de VRAM en curso (BIT0 de $D817).
-; ----------------------------------------------------------------------------
-_vc_setup_busy:
-        lda VID_SETUP_ST
-        and #ST_SETUP_BUSY
         ldx #0
         rts
 

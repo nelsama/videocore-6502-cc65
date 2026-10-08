@@ -250,7 +250,6 @@ uint8_t  vc_status(void);           /* lee STATUS ($D803)                    */
 /* --- Setup de VRAM por hardware ($D816/$D817) ---
  * Dispara el setup del core: limpia tilemap/atributos/patrones y re-expande la
  * fuente (~120-275 us). vc_clear_vram() lo usa internamente. */
-uint8_t  vc_setup_busy(void);       /* 1 = setup en curso (BUSY)             */
 void     vc_wait_setup(void);       /* espera a que el setup termine         */
 
 /* --- Escritura indirecta rápida (no auto-incrementa) --- */

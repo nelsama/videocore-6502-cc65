@@ -111,8 +111,7 @@ ld65 -C config/programa.cfg -o output/prog.bin build/prog.o output/vc.lib \
 | `vc_wait_vblank()` | Espera a **entrar** en VBLANK |
 | `vc_wait_vblank_end()` | Espera a **salir** de VBLANK |
 | `vc_status()` | Lee `$D803` (bits `VC_STATUS_*`) |
-| `vc_setup_busy()` | 1 si hay un **setup de VRAM** en curso (`$D817` bit0 `BUSY`) |
-| `vc_wait_setup()` | Espera a que termine el setup de VRAM (`BUSY=0`) |
+| `vc_wait_setup()` | Espera a que termine el setup de VRAM (`$D817` bit0 `BUSY=0`) |
 
 ### Limpieza de VRAM (recomendado al arrancar)
 
@@ -522,7 +521,7 @@ orienta a quien busque el código de cada función:
 | Función | Archivo | Motivo |
 |---------|---------|--------|
 | `vc_wait_ready/vblank/vblank_end`, `vc_status` | `video.s` | Espera en bucle (rápido) |
-| `vc_setup_busy`, `vc_wait_setup` | `video.s` | Polling del setup de VRAM |
+| `vc_wait_setup` | `video.s` | Polling del setup de VRAM |
 | `vc_write`, `vc_put_cell`, `vc_put_attr` | `video.s` | Puerto indirecto (caliente) |
 | `vc_load_bg_pattern`, `vc_load_spr_pattern` | `video.s` | Carga de gráficos |
 | `vc_oam_put`, `vc_sprite_move`, `vc_sprite_set`, `vc_sprite16_set` | `video.s` | Sprites (cada frame) |
@@ -665,7 +664,7 @@ vc_pal_set_bg/spr(pal,color,rgb444)  vc_pal_load_bg/spr(pal,arr4)
 vc_set_bgcolor(rgb444)          /* color de fondo global (BG_COLOR) */
 
 /* Setup de VRAM por hardware ($D816/$D817) */
-vc_setup_busy()  vc_wait_setup()
+vc_wait_setup()
 VC_SETUP_BUSY (0x01)
 
 /* Flags de sprite */
