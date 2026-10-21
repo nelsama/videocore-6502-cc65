@@ -25,8 +25,11 @@ lo refleja y encapsula; no se necesita conocer el VHDL.
 ├── config/
 │   └── programa.cfg    # Configuración del linker
 ├── docs/
-│   ├── VIDEO-LIB.md    # Documentación de la biblioteca
-│   └── CHANGELOG.md    # Historial de cambios y correcciones
+│   ├── CONCEPTOS-JUEGO.md           # Conceptos de juegos de 8 bits (intro)
+│   ├── GUIA-JUEGOS-SIN-SCROLL.md    # Guía para hacer un juego sin scroll
+│   ├── VIDEO-LIB.md                 # Referencia de la API de la biblioteca
+│   ├── 07-MANUAL-PROGRAMACION.md    # Manual del core de vídeo (hardware)
+│   └── CHANGELOG.md                 # Historial de cambios y correcciones
 ├── examples/
 │   ├── demo/           # Demo que ejercita toda la biblioteca
 │   │   ├── include/romapi.h    # ROM API del monitor (UART, SD, timer)
@@ -119,20 +122,23 @@ Hay cuatro ejemplos en `examples/`, cada uno con su propio makefile:
 
 ## Documentación
 
-**¿Nuevo en gráficos de 8 bits?** Empieza por
-[`docs/CONCEPTOS-JUEGO.md`](docs/CONCEPTOS-JUEGO.md): explica qué es un tile, un
-sprite, el tilemap, la OAM, el scroll, las bandas, el VBLANK, las paletas y cómo se
-arma un juego, sin asumir experiencia previa en juegos de 8 bits.
+Toda la documentación está en [`docs/`](docs/). Por dónde empezar depende de lo que
+busques:
 
-La referencia completa de la API está en
-[`docs/VIDEO-LIB.md`](docs/VIDEO-LIB.md): sincronización, limpieza de VRAM,
-fondo, sprites, colisión, scroll, texto, entrada por UART y la convención de
-llamada cc65 para el núcleo en ensamblador.
+| Documento | Para qué | Empieza aquí si… |
+|---|---|---|
+| [`CONCEPTOS-JUEGO.md`](docs/CONCEPTOS-JUEGO.md) | Qué es un tile, un sprite, la OAM, el tilemap, el scroll, las bandas, el VBLANK, las paletas; y cómo encajan | **nunca has hecho un juego de 8 bits** (conceptos, sin código) |
+| [`GUIA-JUEGOS-SIN-SCROLL.md`](docs/GUIA-JUEGOS-SIN-SCROLL.md) | Guía **autocontenida** para construir un juego de pantalla fija: arranque, patrón de diseño, colisiones, arquetipos y snippets | **vas a programar** un juego sin scroll (vale también para una IA) |
+| [`VIDEO-LIB.md`](docs/VIDEO-LIB.md) | **Referencia de la API** `vc_*`: sincronización, VRAM, sprites, colisión, scroll, texto, paletas, setup | necesitas la **firma exacta** de una función o constante |
+| [`07-MANUAL-PROGRAMACION.md`](docs/07-MANUAL-PROGRAMACION.md) | **Manual del core** (hardware): registros, direcciones, límites, mapa de memoria del vídeo | necesitas saber **cómo funciona el hardware** |
+| [`CHANGELOG.md`](docs/CHANGELOG.md) | Historial de cambios y correcciones de la biblioteca | quieres saber **qué cambió** y desde cuándo |
 
-El comportamiento del hardware (registros, direcciones, límites) está en el
-[manual del core](docs/07-MANUAL-PROGRAMACION.md).
+> **Ruta sugerida:** `CONCEPTOS-JUEGO` → `GUIA-JUEGOS-SIN-SCROLL` (o directo si ya
+> conoces los conceptos) → `VIDEO-LIB` como consulta → `07-MANUAL-PROGRAMACION`
+> cuando necesites el detalle del hardware.
 
-El historial de cambios y correcciones está en [`docs/CHANGELOG.md`](docs/CHANGELOG.md).
+Los ejemplos ejecutables de `examples/` (ver arriba) son el complemento práctico de
+la documentación.
 
 ## Tests
 

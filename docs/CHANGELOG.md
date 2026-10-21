@@ -17,6 +17,14 @@ solo el registro de cambios.
 
 ### Añadido
 
+- **Guía de juegos sin scroll (`docs/GUIA-JUEGOS-SIN-SCROLL.md`).** Documento
+  autocontenido (pensado también para asistentes de IA) para construir un juego de
+  pantalla fija: hardware resumido, arranque del proyecto (makefile, mapa de memoria,
+  esqueleto de `game.c`), patrón "rejilla en tiles + actores en sprites", colisiones,
+  cinco arquetipos (Snake, Space Invaders, Pac-Man, Arkanoid, Tetris), snippets
+  reutilizables, rendimiento, depuración y checklist. Destilado de los cinco juegos
+  reales que usan la biblioteca. Enlazada desde el `README.md`.
+
 - **Setup de VRAM por hardware (`$D816`/`$D817`).** El core puede limpiar la VRAM y
   recargar la fuente en hardware (~120-275 µs). Nueva función:
   - `vc_wait_setup()` — espera a que termine el setup (`BUSY=0`).
