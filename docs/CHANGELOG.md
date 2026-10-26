@@ -17,6 +17,16 @@ solo el registro de cambios.
 
 ### Añadido
 
+- **Manual del core actualizado a la revisión vigente (v2.8).** Copiado desde el
+  proyecto FPGA (`fpga-6502-16k`). Novedades relevantes:
+  - §2.5: registro de sistema `$C004` (`USER_FLAG`, fuera del dominio de reset;
+    **no** es un registro de vídeo, así que **no** entra en esta API).
+  - §6.0: los patrones de sprite **0-2 están reservados** por el arranque del core
+    (formas de demo); el setup los deja a cero. Rango para arte propio: **3-63**.
+  - §6.2b: `SCALE2X` **duplica píxeles de un solo patrón** (no compone 4 cuadrantes).
+  - §4.4: el auto-incremento de `PAL_PTR` **satura en 31**.
+  - Confirmado como límite duro de hardware: **8 sprites por línea**.
+
 - **Guía de juegos sin scroll (`docs/GUIA-JUEGOS-SIN-SCROLL.md`).** Documento
   autocontenido (pensado también para asistentes de IA) para construir un juego de
   pantalla fija: hardware resumido, arranque del proyecto (makefile, mapa de memoria,
@@ -73,6 +83,11 @@ solo el registro de cambios.
   y toda la documentación.
 
 ### Corregido
+
+- **Ejemplos movidos fuera de los patrones de sprite reservados.** `demo`,
+  `collision` y `palette` cargaban arte en los patrones 0-2 (que el arranque del
+  core sobrescribe). Ahora usan patrones **≥ 3**, con constantes `PAT_*` separadas
+  de los slots de OAM.
 
 - **Documentación alineada con el manual del core (`6502_board_v3`).**
   - `README.md`: corregido el árbol de `examples/` (`palette/` estaba mal anidado) y

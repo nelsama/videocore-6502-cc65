@@ -55,6 +55,8 @@ Destilado de cinco juegos reales ya funcionando en este hardware:
   `vc_pal_set_spr(pal, idx, rgb)`.
 - **`BG_COLOR` = entrada 15 = "paleta 3, color 3"**. Es el color de fondo visible
   (donde hay transparencia) y del margen. Se cambia con `vc_set_bgcolor(rgb)`.
+- ⚠️ El auto-incremento del puntero de paleta **satura en 31** (no vuelve a 0);
+  recarga el puntero con `vc_pal_ptr()` si quieres empezar de nuevo.
 - Los **colores son independientes del patrón**: el mismo dibujo se ve de distinto
   color según la paleta. **Aprovéchalo** para no duplicar patrones.
 
@@ -76,10 +78,14 @@ Destilado de cinco juegos reales ya funcionando en este hardware:
 ## 1.4 Sprites (OAM)
 
 - **32 sprites**, cada uno de **8×8** nativo (o 16×16 con `SCALE2X`).
-- **Máximo 8 sprites por línea horizontal**; si se supera, se descartan y el flag
-  `OVERFLOW` se pone a 1. **Planifica el reparto de sprites por fila.**
+- **Máximo 8 sprites por línea horizontal** (límite **duro** del chip); si se supera,
+  se descartan y el flag `OVERFLOW` se pone a 1. **Planifica el reparto por fila.**
 - El campo `TILE` del OAM es el **índice de patrón de SPRITE (0-63)**, un banco
   **aparte** del fondo. No confundir con un tile de fondo.
+- ⚠️ **Los patrones 0-2 están reservados** por el arranque del core (formas de demo)
+  y el setup los deja a cero. **Usa 3..63 para tu arte.**
+- **`SCALE2X` duplica píxeles, no compone 4 patrones**: un 8×8 pasa a 16×16 leyendo
+  **un solo** patrón. Para un 16×16 real usa **4 sprites** de 8×8.
 - Coordenada **X de 9 bits (0-511)**; la biblioteca gestiona el bit 8.
 - `Y ≥ 248` **deshabilita** el sprite.
 - Prioridad: **gana el sprite de menor índice** de OAM.

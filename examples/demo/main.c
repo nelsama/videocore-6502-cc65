@@ -103,10 +103,18 @@ static const uint8_t box_p1[4][8] = {
 /* ===========================================================================
  * ESTADO DEL JUEGO
  * =========================================================================== */
+/* Slots de OAM (posiciones de sprite en pantalla) */
 #define SPR_PLAYER    0     /* sprite base del jugador (8x8) */
 #define SPR_RHOM      3     /* sprite 8x8 dibujado a 2x -> 16x16 */
 #define SPR_BLOCK     4     /* sprite base del bloque 16x16 (usa 4..7) */
 #define PLAYER_FRAMES 3
+
+/* Indices de PATRON de sprite (0-63).
+ * Los patrones 0-2 los escribe el arranque del core (formas de demo) y el
+ * setup los deja a cero, asi que el arte propio empieza en el 3. */
+#define PAT_PLAYER    3     /* jugador: frames 3, 4 y 5            */
+#define PAT_RHOM      6     /* rombo 2x                            */
+#define PAT_BLOCK     7     /* bloque 16x16: 7..10 (4 cuadrantes)  */
 
 static uint16_t px, py;      /* jugador (X 9 bits) */
 static int8_t   vx, vy;
@@ -137,14 +145,14 @@ static void load_assets(void) {
     vc_load_bg_pattern(TILE_STAR,  tile_star_p0,  tile_star_p1);
 
     /* Patrones de sprite: jugador (3 frames) + rombo 2x + bloque 16x16 */
-    vc_load_spr_pattern(0, pers0_p0, pers0_p1);
-    vc_load_spr_pattern(1, pers1_p0, pers1_p1);
-    vc_load_spr_pattern(2, pers2_p0, pers2_p1);
-    vc_load_spr_pattern(SPR_RHOM, rhom_p0, rhom_p1);
-    vc_load_spr_pattern(4, box_p0[0], box_p1[0]);
-    vc_load_spr_pattern(5, box_p0[1], box_p1[1]);
-    vc_load_spr_pattern(6, box_p0[2], box_p1[2]);
-    vc_load_spr_pattern(7, box_p0[3], box_p1[3]);
+    vc_load_spr_pattern(PAT_PLAYER + 0, pers0_p0, pers0_p1);
+    vc_load_spr_pattern(PAT_PLAYER + 1, pers1_p0, pers1_p1);
+    vc_load_spr_pattern(PAT_PLAYER + 2, pers2_p0, pers2_p1);
+    vc_load_spr_pattern(PAT_RHOM, rhom_p0, rhom_p1);
+    vc_load_spr_pattern(PAT_BLOCK + 0, box_p0[0], box_p1[0]);
+    vc_load_spr_pattern(PAT_BLOCK + 1, box_p0[1], box_p1[1]);
+    vc_load_spr_pattern(PAT_BLOCK + 2, box_p0[2], box_p1[2]);
+    vc_load_spr_pattern(PAT_BLOCK + 3, box_p0[3], box_p1[3]);
 }
 
 static void build_world(void) {
@@ -247,7 +255,7 @@ static void move_player(void) {
 
     /* Recoloca el sprite del jugador con el frame actual (tile = frame) */
     vc_sprite_move(SPR_PLAYER, px, py, VC_SPPAL_2);
-    vc_oam_put(SPR_PLAYER, VC_OAM_TILE, frame);
+    vc_oam_put(SPR_PLAYER, VC_OAM_TILE, (uint8_t)(PAT_PLAYER + frame));
 }
 
 /* Bloque 16x16 (4 sprites de 8x8 a 1x). */
@@ -262,7 +270,7 @@ static void move_block(void) {
     if (by >= (224 - BLOCK_W)) { by = 224 - BLOCK_W; bvy = (int8_t)-bvy; }
     else if (by <= 32) { by = 32; bvy = (int8_t)-bvy; }
 
-    vc_sprite16_set(SPR_BLOCK, bx, by, 4, VC_SPPAL_3);   /* 16x16 a 1x */
+    vc_sprite16_set(SPR_BLOCK, bx, by, PAT_BLOCK, VC_SPPAL_3);   /* 16x16 a 1x */
 }
 
 /* Rombo 8x8 dibujado a 2x -> 16x16 en pantalla. */
@@ -278,7 +286,7 @@ static void move_rhom(void) {
 
     /* SCALE2X: un solo sprite de 8x8 dibujado al doble. */
     vc_sprite_move(SPR_RHOM, rx, ry, VC_SPPAL_1 | VC_SPR_SCALE2X);
-    vc_oam_put(SPR_RHOM, VC_OAM_TILE, SPR_RHOM);
+    vc_oam_put(SPR_RHOM, VC_OAM_TILE, PAT_RHOM);
 }
 
 static void update_frame(void) {
@@ -358,7 +366,7 @@ int main(void) {
         vc_sprite_t s;
         s.x_lo  = (uint8_t)px;
         s.y     = (uint8_t)py;
-        s.tile  = 0;
+        s.tile  = PAT_PLAYER;
         s.flags = VC_SPPAL_2;
         s.coll  = VC_COLL_FEET;
         vc_sprite_set(SPR_PLAYER, &s);
@@ -366,7 +374,7 @@ int main(void) {
 
     /* Bloque 16x16 (4 sprites a 1x) */
     bx = 150; by = 120; bvx = 1; bvy = 2;
-    vc_sprite16_set(SPR_BLOCK, bx, by, 4, VC_SPPAL_3);
+    vc_sprite16_set(SPR_BLOCK, bx, by, PAT_BLOCK, VC_SPPAL_3);
 
     /* Rombo 8x8 a 2x (se ve 16x16) */
     rx = 200; ry = 60; rvx = -2; rvy = 1;
@@ -374,7 +382,7 @@ int main(void) {
         vc_sprite_t s;
         s.x_lo  = (uint8_t)rx;
         s.y     = (uint8_t)ry;
-        s.tile  = SPR_RHOM;
+        s.tile  = PAT_RHOM;
         s.flags = VC_SPPAL_1 | VC_SPR_SCALE2X;
         s.coll  = VC_COLL_CENTER;
         vc_sprite_set(SPR_RHOM, &s);

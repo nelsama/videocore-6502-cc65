@@ -172,6 +172,33 @@ bits del `$D801`. Cada una tiene su propio espacio de direcciones (empieza en 0)
 - El OAM **no tiene “dirección de patrón”: son registros sueltos**, no un array 2D;
   su dirección es simplemente el índice de byte (0..159).
 
+### 2.5 Registros de sistema: flag de usuario (`$C004`)
+
+Aparte del área de vídeo, el CPU dispone de un registro de propósito general en
+`$C004`:
+
+| Dir | Bits | R/W | Descripción |
+|-----|------|-----|-------------|
+| `$C004` | 0 | R/W | `USER_FLAG`: 1 bit libre para el programa/SO |
+| `$C004` | 7-1 | R | Siempre leen 0 |
+
+**Característica principal:** **no se resetea con S1** ni con un reset por software,
+porque su lógica no está unida al reset del sistema. Solo vuelve a 0 al recargar el
+bitstream o al apagar la placa.
+
+```asm
+    LDA #$01
+    STA $C004      ; activa el flag
+
+    LDA $C004      ; leer: bit 0 = estado
+    AND #$01
+    BEQ flag_off
+```
+
+> Al escribir solo se guarda el **bit 0**; el resto de bits se ignoran.
+> Para el mapa de memoria completo del sistema (RAM, ROM, GPIO, I2C, UART, timer,
+> SPI, SID), consulta `03-FORMATOS-Y-MEMORIA.md` §5.
+
 ---
 
 ## 3. Resolución, coordenadas y unidades
@@ -323,6 +350,9 @@ parpadeos, paletas por nivel, etc.
   - Sprite: entradas 16-31 → paleta 0 = 16-19, paleta 1 = 20-23, etc.
 - **`PAL_PTR` avanza solo** al escribir `$D815`, así que para cargar una paleta
   completa pones el puntero **una vez** y encadenas escrituras.
+- **El auto-incremento satura en 31**: tras escribir la entrada 31 el puntero se
+  queda ahí y no vuelve a 0. Las 32 entradas son alcanzables, y reescribir la 31
+  no toca ninguna otra. Para volver a empezar hay que recargar `$D813`.
 - Formato del color: **RGB444**, un nibble por canal. Ej.: `$F80` = rojo F, verde 8,
   azul 0 = naranja `#FF8800`.
 
@@ -501,6 +531,21 @@ Los sprites usan un **banco aparte** del de fondo. Su tamaño y direccionamiento
 > ⚠️ **Rango del campo `TILE` del OAM:** el byte `TILE` (+2) es de **6 bits (0..63)**
 > y el banco tiene **64 patrones**. Usa **TILE = 0..63** para seleccionar el patrón.
 
+> ⚠️ **Los patrones 0-2 los escribe el arranque del core.** Al encender, la
+> secuencia de inicialización graba en los patrones 0, 1 y 2 tres formas de demo
+> (cara, rombo, X). Si pides un setup por `$D816`, esas mismas posiciones quedan
+> **a cero**. Son patrones **reservados por el sistema**: si los usas, verás esas
+> formas (o nada) en vez de tu dibujo.
+>
+> **Rango recomendado para tu arte: 3..63.** El resto de la inicialización (la
+> expansión de la fuente) escribe en el banco de **fondo**, no en el de sprite,
+> así que los patrones **3..63 no los toca nadie**.
+
+| Patrones | Quién los escribe |
+|---|---|
+| **0-2** | El arranque del core (formas de demo) o el setup `$D816` (ceros) |
+| **3-63** | Solo tu programa |
+
 ### 6.1 Estructura (5 bytes por sprite)
 
 | Offset | Campo |
@@ -515,7 +560,8 @@ Los sprites usan un **banco aparte** del de fondo. Su tamaño y direccionamiento
 
 - `PRIO=1` → sprite **detrás** del fondo (sólo se ve en huecos del fondo).
 - `PRIO=0` → sprite **delante** del fondo.
-- `SCALE2X=1` → sprite dibujado al doble (16×16 en pantalla).
+- `SCALE2X=1` → sprite dibujado al doble (16×16 en pantalla), **duplicando los
+  píxeles de un único patrón**. No compone 4 patrones: ver §6.2b y §13.
 - **`X_bit8` (bit 2)** = bit 8 de la coordenada X → permite X de **0 a 511**
   (toda la pantalla, 0-319). Ver §6.2.
 - Prioridad entre sprites: **menor índice de OAM gana**.
@@ -552,6 +598,47 @@ Ejemplos:
     LDA XLO : STA $D802   ; (tras poner addr al byte X)
     ; FLAGS = (XHI<<2) | flags/paleta
 ```
+
+### 6.2b Escalado 2× (`SCALE2X`)
+
+El bit 4 de `FLAGS` activa el escalado 2×. **Escala en los dos ejes**: un sprite
+8×8 pasa a ocupar **16×16 píxeles** en pantalla.
+
+**Lo que hace exactamente:** cada píxel del patrón se dibuja como un bloque de
+2×2. Se sigue leyendo **un solo patrón** (el del campo `TILE`), y cada fila y
+cada columna se repiten dos veces.
+
+| | Ancho en pantalla | Patrón leído |
+|---|---|---|
+| `SCALE2X=0` | 8 px | `TILE` |
+| `SCALE2X=1` | 16 px | `TILE` (el mismo) |
+
+> ⚠️ **No compone 4 patrones.** No lee `TILE+1`, `TILE+2` ni `TILE+3`. Un
+> `SCALE2X` **no** es un "sprite grande" hecho de cuadrantes: es el mismo dibujo
+> ampliado. Como el banco solo tiene 64 patrones, no hay sitio para componer 4
+> por sprite.
+
+**Qué usar según el caso:**
+
+| Quieres | Cómo |
+|---|---|
+| El mismo dibujo al doble | `SCALE2X=1`, 1 sprite |
+| Un dibujo de 16×16 **distinto** (4 patrones) | **4 sprites** de 8×8, sin `SCALE2X` |
+| Un dibujo de 32×32 | 16 sprites de 8×8 |
+| Efecto pixel-art "gordo" en 2× | `SCALE2X=1` |
+
+**Efecto en la colisión:** si el sprite es 2×, `COLL_POINT` se escala solo
+(`dx 0-7 → 0-15`). Tú sigues escribiendo dx/dy en escala 0-7. Ver §10.3.
+
+```asm
+; mismo dibujo (patron 9) al doble: ocupa 16x16 desde (X,Y)
+    LDA #$10          ; FLAGS: bit4 = SCALE2X
+    STA $D802
+```
+
+**Coste:** el `SCALE2X` se resuelve **dentro del line buffer**, sin sprites ni
+patrones extra. Pero el sprite 2× sigue ocupando **1 de los 8 huecos por
+línea** (§13), no 4.
 
 ### 6.3 Escribir un campo del OAM
 
@@ -1324,19 +1411,42 @@ wait_setup:
 | Sprites | 32 en OAM | Más requeriría otro hardware |
 | Coordenada X | **9 bits (0-511)** | bit 8 en FLAGS(2) → cubre toda la pantalla |
 | Coordenada Y | 8 bits (0-255) | pantalla 240 → sobra |
-| Sprites por línea | **8** | Más → `OVERFLOW` y se pierde alguno |
-| Sprites (patrones) | **64** (0..63) | 8×8, 2bpp; el campo TILE es de 6 bits (§6.0) |
+| Sprites por línea | **8 (máximo del chip)** | Más → `OVERFLOW` y se pierde alguno. **8 es un límite duro de este bitstream** (ver nota abajo) |
+| Sprites (patrones) | **64** (0..63) | 8×8, 2bpp; el campo TILE es de 6 bits (§6.0). **0-2 los escribe el arranque** (ver nota abajo) |
 | Patrones de fondo | 256 | comparte rango con la fuente (`$20`-`$7F`) |
 | Paletas de fondo / sprite | 4 / 4 | cada una de 4 colores; **escribibles** por el CPU (§4.4) |
 | Colores en pantalla | hasta 32 | 16 de fondo (4 paletas × 4) + 16 de sprite |
 | Mapa | 64×32 | scroll con envoltura |
 | Framebuffer | **no hay** | los píxeles se generan al vuelo |
+| `SCALE2X` | **duplica píxeles** | 8×8 → 16×16 con un **único** patrón (no compone 4). Ver nota abajo |
 | Colisión sprite↔sprite | **no hay** | hacer por software (comparar X/Y) |
 | Colisión sprite↔tile | flag **global** | no dice qué sprite; deducir por software |
 | COLL_POINT | dx, dy **0-7** | auto-escala a 0-15 si el sprite es 2× |
 | Rotación de sprites | **no hay** | usar sprites pre-rotados |
 | Setup de VRAM (`$D816`) | limpia + re-expande fuente | ~120-275 µs; durante `BUSY` se ignoran escrituras CPU a VRAM/OAM |
 | Overscan del monitor | variable | las filas 0 y 29 pueden recortarse según el monitor |
+
+> **Sobre los 8 sprites por línea:** es un **límite duro de este bitstream** (chip
+> GW1NR-9), no una elección arbitraria. El line buffer de sprites ocupa registros
+> y el chip ya está al **~98% de CLS** (celdas lógicas). Subir a 9 o 10 sprites por
+> línea **no pasa el placement** de Gowin (`Failed to place with N REG(s)
+> unPlaced`). Para ampliarlo habría que **liberar CLS** de otro módulo (SD, SID,
+> UART) o migrar el line buffer a BSRAM (que también está al 100%).
+
+> **Sobre los patrones de sprite 0-2:** el arranque del core los **sobrescribe**
+> con tres formas de demo (cara, rombo, X). Si pides un setup por `$D816`, en su
+> lugar quedan **a cero**. Son patrones **del sistema**, no libres: si los usas,
+> se verán con esas formas o transparentes. Usa los patrones **3-63** para tu
+> propio arte. El resto de la secuencia de init **no toca** los patrones 3-63;
+> la expansión de la fuente escribe en los patrones de **fondo**, no en los de
+> sprite.
+
+> **Sobre `SCALE2X`:** es **duplicación de píxeles**, no composición. Un sprite
+> con el bit 4 de FLAGS activo se dibuja a **16×16** leyendo **un único patrón**
+> (cada fila y cada columna se repite). **No** lee `patron+1`, `+2` ni `+3`: no
+> hay "sprites grandes" de 4 cuadrantes en hardware. Para un personaje de 16×16
+> real (4 patrones distintos) hay que usar **4 sprites** de 8×8, que además
+> admite cualquier tamaño por composición.
 
 **Buenas prácticas:**
 
@@ -1471,7 +1581,7 @@ byte_oam   = sprite*5 + campo            (campo 0..4)
 | Dir | R/W | Uso |
 |-----|-----|-----|
 | `$D803` | R | STATUS del vídeo: VBLANK(7), OVERFLOW(6), SOLID_HIT(5), VIDEO_READY(4) |
-| `$D813/$D814/$D815` | W | Paleta (PTR / LO / HI); HI escribe y `PTR++`. Entrada 15 = `BG_COLOR` |
+| `$D813/$D814/$D815` | W | Paleta (PTR / LO / HI); HI escribe y `PTR++` (satura en 31). Entrada 15 = `BG_COLOR` |
 | `$D816` | W | **Setup de VRAM** (escribir cualquier valor lo dispara) |
 | `$D817` | R | Estado del setup: BUSY(0), VIDEO_READY(4) |
 

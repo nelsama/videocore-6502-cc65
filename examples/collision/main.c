@@ -46,6 +46,11 @@ static const uint8_t tile_solid_p1[8] = { 0,0,0,0,0,0,0,0 };
 #define NUM_OBJS   4
 #define OBJ_SIZE   8          /* objetos 8x8 (la caja coincide con el sprite) */
 #define SHIP_SPR   8           /* slot de OAM de la nave */
+
+/* Indices de PATRON de sprite (0-63). Los 0-2 los usa el arranque del core;
+ * el arte propio empieza en el 3. */
+#define PAT_DOT    3           /* punto (objetos 8x8) */
+#define PAT_SHIP   4           /* nave (se dibuja a 2x) */
 #define SHIP_SIZE  16          /* en pantalla (8x8 a 2x) */
 
 static uint16_t ox[NUM_OBJS], oy[NUM_OBJS];
@@ -97,8 +102,8 @@ static void setup_video(void) {
         vc_set_cell_attr(x, VC_MAP_ROWS - 2, VC_BGPAL_1, VC_ATTR_SOLID);
     }
 
-    vc_load_spr_pattern(0, dot_p0, dot_p1);
-    vc_load_spr_pattern(SHIP_SPR, ship_p0, ship_p1);
+    vc_load_spr_pattern(PAT_DOT, dot_p0, dot_p1);
+    vc_load_spr_pattern(PAT_SHIP, ship_p0, ship_p1);
 }
 
 static void init_objects(void) {
@@ -120,7 +125,7 @@ static void init_objects(void) {
         vc_sprite_t s;
         s.x_lo  = (uint8_t)ox[i];
         s.y     = (uint8_t)oy[i];
-        s.tile  = 0;
+        s.tile  = PAT_DOT;
         s.flags = pal_normal[i];
         s.coll  = VC_COLL_CENTER;
         vc_sprite_set(i, &s);
@@ -132,7 +137,7 @@ static void init_objects(void) {
         vc_sprite_t s;
         s.x_lo  = (uint8_t)sx;
         s.y     = (uint8_t)sy;
-        s.tile  = SHIP_SPR;
+        s.tile  = PAT_SHIP;
         s.flags = VC_SPPAL_3 | VC_SPR_SCALE2X;   /* 16x16 en pantalla */
         s.coll  = VC_COLL_CENTER;
         vc_sprite_set(SHIP_SPR, &s);
@@ -170,7 +175,7 @@ static void move_ship(void) {
     else if (sy <= 16) { sy = 16; svy = (int8_t)-svy; }
 
     vc_sprite_move(SHIP_SPR, sx, sy, VC_SPPAL_3 | VC_SPR_SCALE2X);
-    vc_oam_put(SHIP_SPR, VC_OAM_TILE, SHIP_SPR);
+    vc_oam_put(SHIP_SPR, VC_OAM_TILE, PAT_SHIP);
 }
 
 /* ===========================================================================
@@ -248,7 +253,7 @@ static void update_frame(void) {
     for (i = 0; i < NUM_OBJS; i++) {
         uint8_t flags = ocol[i] ? VC_SPPAL_2 : pal_normal[i];
         vc_sprite_move(i, ox[i], oy[i], flags);
-        vc_oam_put(i, VC_OAM_TILE, 0);
+        vc_oam_put(i, VC_OAM_TILE, PAT_DOT);
     }
 
     move_ship();

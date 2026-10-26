@@ -24,6 +24,10 @@
 #include "video.h"
 #include "romapi.h"
 
+/* Indice de PATRON de sprite. Los patrones 0-2 los usa el arranque del core,
+ * asi que el arte propio empieza en el 3. */
+#define PAT_RHOM   3
+
 /* --- Patron de tile de prueba: color 3 (el mas claro de la paleta) --- */
 static const uint8_t tile_p0[8] = {0xFF,0x81,0x81,0x81,0x81,0x81,0x81,0xFF};
 static const uint8_t tile_p1[8] = {0x00,0x7E,0x7E,0x7E,0x7E,0x7E,0x7E,0x00};
@@ -122,12 +126,12 @@ static void setup_video(void) {
     }
 
     /* Sprite rombo, paleta de sprite 1 */
-    vc_load_spr_pattern(0, spr_p0, spr_p1);
+    vc_load_spr_pattern(PAT_RHOM, spr_p0, spr_p1);
     {
         vc_sprite_t s;
         s.x_lo  = 100;
         s.y     = 96;
-        s.tile  = 0;
+        s.tile  = PAT_RHOM;
         s.flags = VC_SPPAL_1 | VC_SPR_SCALE2X;   /* paleta sprite 1 */
         s.coll  = VC_COLL_CENTER;
         vc_sprite_set(0, &s);

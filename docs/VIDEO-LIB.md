@@ -57,6 +57,11 @@ gestiona por ti (`vc_*`); solo necesitas conocerlas para **calcular presupuestos
 | **OAM** | 160 B (32 sprites) | X / Y / TILE / FLAGS / COLL de cada sprite | `vc_sprite_set` |
 | **Patrones de sprite** | 64 patrones | los dibujos de los sprites (8×8, 2bpp) | `vc_load_spr_pattern` |
 
+> ⚠️ **Patrones de sprite 0-2 reservados.** El arranque del core graba en los
+> patrones **0, 1 y 2** tres formas de demo (cara, rombo, X); el setup de VRAM
+> (`vc_clear_vram()`) los deja **a cero**. Son del sistema: **usa los patrones
+> 3-63** para tu arte.** Los patrones 3-63 no los toca nadie.
+
 > **Banco de patrones vs OAM:** el **banco de patrones** son los *dibujos*
 disponibles; la **OAM** (32 sprites) son los sprites *colocados* en pantalla. Cada
 entrada de la OAM tiene un campo `TILE` que dice cuál de los dibujos usa. Varios
@@ -286,6 +291,11 @@ vc_pal_set(VC_PAL_SPR(2, 3), 0x0F0);    /* escribe el color y auto-avanza */
 Macros de color: `VC_RGB444(r,g,b)` (componentes 0-15), `VC_RGB888(0xRRGGBB)`,
 `VC_PAL_BG(pal,color)`, `VC_PAL_SPR(pal,color)`.
 
+> ⚠️ **El auto-incremento de `PAL_PTR` satura en 31**: tras escribir la entrada 31
+> el puntero se queda ahí (no vuelve a 0). Las 32 entradas son alcanzables y
+> reescribir la 31 no toca ninguna otra. Para empezar de nuevo, recarga con
+> `vc_pal_ptr(entrada)`.
+
 #### Color de fondo global (`BG_COLOR`)
 
 `BG_COLOR` es lo que se ve en el **margen** y en el **fondo vacío** (tile con color 0
@@ -330,7 +340,14 @@ Puntos de colisión: `VC_COLL_CENTER`, `VC_COLL_FEET`, `VC_COLL_HEAD`,
 > `vc_load_spr_pattern(patron, ...)` maneja automáticamente la **dirección alta**
 > (`dir_alta`, bits 2:0 de `$D801`) al escribir el patrón: `patron*8+fila` puede
 > llegar a 511 y la función reparte la dirección entre `$D800` y `$D801` por ti.
-> Puedes usar **patrón 0..63** (el valor que luego pones en el campo `TILE` del OAM).
+> Puedes escribir **cualquier patrón 0..63**, pero reserva **0-2** (los usa el
+> arranque del core): usa **3..63** para arte propio.
+
+> **`VC_SPR_SCALE2X` duplica píxeles, no compone 4 patrones.** Un sprite 8×8 con ese
+> flag ocupa **16×16** en pantalla leyendo **un único patrón** (cada fila y columna
+> se repite). No lee `patron+1/+2/+3`. Para un 16×16 real (4 dibujos distintos) usa
+> **4 sprites** de 8×8 (lo que hace `vc_sprite16_set`). El sprite 2× sigue ocupando
+> **1 slot** de los 8 por línea.
 
 ### Animación
 
