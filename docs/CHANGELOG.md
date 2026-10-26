@@ -137,6 +137,39 @@ solo el registro de cambios.
   > librería escribe el valor correcto. Un byte mal pasado puede parecer un bug de
   > hardware.
 
+### Pendiente / ideas (no implementado)
+
+Anotado para valorar más adelante. **Nada de esto está en la API actual.**
+
+- **`vc_sprite16_set` con punto de colisión configurable.** Hoy escribe siempre
+  `COLL = $24` (`VC_COLL_CENTER`) en los 4 cuadrantes; el valor está *hardcodeado*
+  en `spr16_quad` (`lda #$24`) y la función no acepta un parámetro para cambiarlo.
+  Opciones:
+  - añadir un parámetro `coll` (rompe la firma actual), o
+  - nueva `vc_sprite16_set_coll(first, x, y, tile0, flags, coll)`, o
+  - variante que deje la colisión solo en los cuadrantes que se indiquen.
+
+  Mientras tanto el usuario puede **sobrescribir** `VC_OAM_COLL` de los cuadrantes
+  con `vc_oam_put` después de llamar a `vc_sprite16_set`.
+
+- **Helpers de composición 16×8 y 8×16.** Hoy solo existe el atajo 2×2. Añadir
+  funciones que compongan 2 sprites en horizontal o vertical, cuidando los mismos
+  puntos que resuelve la de 16×16:
+  - **desplazamiento**: `+8` en X (16×8) o en Y (8×16), con el **bit 8 de X**
+    gestionado (X de 9 bits, suma de 16 bits);
+  - **patrones**: `tile0` y `tile0+1`;
+  - **colisión**: decidir `COLL` (centro por defecto, o configurable como arriba);
+  - **flip**: si se voltea en X, además de `VC_SPR_FLIP_X` hay que **intercambiar**
+    las posiciones de las dos mitades (un helper lo haría solo);
+  - **slots OAM**: reservar 2 consecutivos, y documentar el **límite de 8 sprites
+    por línea** (16×8 = 2 por línea; 8×16 = 1 por cada una de sus 2 filas).
+
+  Mientras tanto se hace a mano con `vc_sprite_move` + `vc_oam_put` (ver
+  `docs/VIDEO-LIB.md`, sección de sprites).
+
+- **Tamaños arbitrarios N×M.** Generalizar la composición (32×16, 24×8, …) sobre
+  una rejilla de celdas de 8×8, con una única función que reciba filas y columnas.
+
 ## [Inicial]
 
 ### Corregido
