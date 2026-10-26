@@ -110,8 +110,9 @@ static const uint8_t box_p1[4][8] = {
 #define PLAYER_FRAMES 3
 
 /* Indices de PATRON de sprite (0-63).
- * Los patrones 0-2 los escribe el arranque del core (formas de demo) y el
- * setup los deja a cero, asi que el arte propio empieza en el 3. */
+ * Los patrones 0-2 arrancan con arte de demo del core (y el setup los deja a
+ * cero); no estan reservados, pero el arte propio empieza en el 3 para no
+ * depender de sobrescribirlos. */
 #define PAT_PLAYER    3     /* jugador: frames 3, 4 y 5            */
 #define PAT_RHOM      6     /* rombo 2x                            */
 #define PAT_BLOCK     7     /* bloque 16x16: 7..10 (4 cuadrantes)  */

@@ -57,10 +57,11 @@ gestiona por ti (`vc_*`); solo necesitas conocerlas para **calcular presupuestos
 | **OAM** | 160 B (32 sprites) | X / Y / TILE / FLAGS / COLL de cada sprite | `vc_sprite_set` |
 | **Patrones de sprite** | 64 patrones | los dibujos de los sprites (8×8, 2bpp) | `vc_load_spr_pattern` |
 
-> ⚠️ **Patrones de sprite 0-2 reservados.** El arranque del core graba en los
-> patrones **0, 1 y 2** tres formas de demo (cara, rombo, X); el setup de VRAM
-> (`vc_clear_vram()`) los deja **a cero**. Son del sistema: **usa los patrones
-> 3-63** para tu arte.** Los patrones 3-63 no los toca nadie.
+> ⚠️ **Los patrones de sprite 0-2 no arrancan vacíos.** Al encender, el core graba
+> en ellos tres formas de demo (cara, rombo, X); tras un setup de VRAM quedan a
+> cero. **No están reservados: los 64 patrones (0-63) son utilizables.** Solo hay
+> que **sobrescribir 0-2** con tu arte (igual que cualquier otro patrón) en vez de
+> asumir que están vacíos. Lo mismo pasa con los **tiles de fondo 0-7**.
 
 > **Banco de patrones vs OAM:** el **banco de patrones** son los *dibujos*
 disponibles; la **OAM** (32 sprites) son los sprites *colocados* en pantalla. Cada
@@ -340,8 +341,9 @@ Puntos de colisión: `VC_COLL_CENTER`, `VC_COLL_FEET`, `VC_COLL_HEAD`,
 > `vc_load_spr_pattern(patron, ...)` maneja automáticamente la **dirección alta**
 > (`dir_alta`, bits 2:0 de `$D801`) al escribir el patrón: `patron*8+fila` puede
 > llegar a 511 y la función reparte la dirección entre `$D800` y `$D801` por ti.
-> Puedes escribir **cualquier patrón 0..63**, pero reserva **0-2** (los usa el
-> arranque del core): usa **3..63** para arte propio.
+> Puedes escribir **cualquier patrón 0..63**. Ojo: **0-2 no arrancan vacíos** (el
+> core graba ahí formas de demo al encender), así que si los usas, **sobrescríbelos**
+> con tu arte como cualquier otro. El setup de VRAM los deja a cero.
 
 > **`VC_SPR_SCALE2X` duplica píxeles, no compone 4 patrones.** Un sprite 8×8 con ese
 > flag ocupa **16×16** en pantalla leyendo **un único patrón** (cada fila y columna

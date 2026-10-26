@@ -82,8 +82,10 @@ Destilado de cinco juegos reales ya funcionando en este hardware:
   se descartan y el flag `OVERFLOW` se pone a 1. **Planifica el reparto por fila.**
 - El campo `TILE` del OAM es el **índice de patrón de SPRITE (0-63)**, un banco
   **aparte** del fondo. No confundir con un tile de fondo.
-- ⚠️ **Los patrones 0-2 están reservados** por el arranque del core (formas de demo)
-  y el setup los deja a cero. **Usa 3..63 para tu arte.**
+- ⚠️ **Los patrones 0-2 no arrancan vacíos** (el core graba ahí formas de demo al
+  encender). **No están reservados: los 64 patrones (0-63) son utilizables.** Si usas
+  0-2, **sobrescríbelos** con tu arte; el setup de VRAM los deja a cero. Igual con
+  los **tiles de fondo 0-7** (traen texturas de demo).
 - **`SCALE2X` duplica píxeles, no compone 4 patrones**: un 8×8 pasa a 16×16 leyendo
   **un solo** patrón. Para un 16×16 real usa **4 sprites** de 8×8.
 - Coordenada **X de 9 bits (0-511)**; la biblioteca gestiona el bit 8.

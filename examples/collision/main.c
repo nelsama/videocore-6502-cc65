@@ -47,8 +47,9 @@ static const uint8_t tile_solid_p1[8] = { 0,0,0,0,0,0,0,0 };
 #define OBJ_SIZE   8          /* objetos 8x8 (la caja coincide con el sprite) */
 #define SHIP_SPR   8           /* slot de OAM de la nave */
 
-/* Indices de PATRON de sprite (0-63). Los 0-2 los usa el arranque del core;
- * el arte propio empieza en el 3. */
+/* Indices de PATRON de sprite (0-63). Los 0-2 arrancan con arte de demo del
+ * core, asi que el arte propio empieza en el 3 (no es obligatorio, pero evita
+ * depender de sobrescribirlos). */
 #define PAT_DOT    3           /* punto (objetos 8x8) */
 #define PAT_SHIP   4           /* nave (se dibuja a 2x) */
 #define SHIP_SIZE  16          /* en pantalla (8x8 a 2x) */

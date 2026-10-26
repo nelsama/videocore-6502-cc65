@@ -24,8 +24,8 @@
 #include "video.h"
 #include "romapi.h"
 
-/* Indice de PATRON de sprite. Los patrones 0-2 los usa el arranque del core,
- * asi que el arte propio empieza en el 3. */
+/* Indice de PATRON de sprite. Los patrones 0-2 arrancan con arte de demo del
+ * core, asi que el arte propio empieza en el 3. */
 #define PAT_RHOM   3
 
 /* --- Patron de tile de prueba: color 3 (el mas claro de la paleta) --- */

@@ -531,20 +531,40 @@ Los sprites usan un **banco aparte** del de fondo. Su tamaño y direccionamiento
 > ⚠️ **Rango del campo `TILE` del OAM:** el byte `TILE` (+2) es de **6 bits (0..63)**
 > y el banco tiene **64 patrones**. Usa **TILE = 0..63** para seleccionar el patrón.
 
-> ⚠️ **Los patrones 0-2 los escribe el arranque del core.** Al encender, la
-> secuencia de inicialización graba en los patrones 0, 1 y 2 tres formas de demo
-> (cara, rombo, X). Si pides un setup por `$D816`, esas mismas posiciones quedan
-> **a cero**. Son patrones **reservados por el sistema**: si los usas, verás esas
-> formas (o nada) en vez de tu dibujo.
+> ⚠️ **Los patrones 0-2 no arrancan vacíos.** Al encender, la secuencia de
+> inicialización graba en los patrones 0, 1 y 2 tres formas de demo (cara, rombo,
+> X). Si pides un setup por `$D816`, esas mismas posiciones quedan **a cero**.
 >
-> **Rango recomendado para tu arte: 3..63.** El resto de la inicialización (la
-> expansión de la fuente) escribe en el banco de **fondo**, no en el de sprite,
-> así que los patrones **3..63 no los toca nadie**.
+> **No es una restricción: los 64 patrones son utilizables.** La única condición es
+> **no asumir que 0-2 están vacíos**: si quieres usarlos, escríbelos con tu arte
+> igual que cualquier otro (ver abajo). Un juego que carga todos sus patrones al
+> arrancar puede usar el rango completo **0..63** sin problemas.
 
-| Patrones | Quién los escribe |
-|---|---|
-| **0-2** | El arranque del core (formas de demo) o el setup `$D816` (ceros) |
-| **3-63** | Solo tu programa |
+| Patrones | Al arrancar | ¿Utilizable? |
+|---|---|---|
+| **0-2** | Formas de demo (cara, rombo, X); ceros tras `$D816` | ✅ Sí, sobrescribiéndolos |
+| **3-63** | Ceros | ✅ Sí |
+
+**Sobrescribir los patrones 0-2** (mismo mecanismo que cualquier patrón de sprite;
+dirección `patron*8 + fila`, `$D801` = `$C8` plano 0 / `$E8` plano 1; ver §2.2 y
+Apéndice A.1):
+
+```asm
+; patron de sprite 0, fila 0, plano 0
+    LDA #$00 : STA $D800     ; dir = patron*8 + fila = 0
+    LDA #$C8 : STA $D801     ; area 11 + sprite + plano 0
+    LDA #$FF : STA $D802     ; plano 0
+; plano 1 (escribe la palabra completa de 16 bits)
+    LDA #$E8 : STA $D801
+    LDA #$00 : STA $D802
+```
+
+> **Importante:** las escrituras del CPU se **ignoran mientras `init_done='0'`**, es
+> decir durante el arranque (~275 µs) y mientras un setup `$D816` tenga `BUSY=1`.
+> **Espera `VIDEO_READY`** (bit 4 de `$D803`) antes de escribir patrones.
+
+> Los **tiles de fondo 0-7** tienen el mismo caso: vienen con texturas de demo y se
+> sobrescriben exactamente igual por la misma vía.
 
 ### 6.1 Estructura (5 bytes por sprite)
 
@@ -1412,7 +1432,7 @@ wait_setup:
 | Coordenada X | **9 bits (0-511)** | bit 8 en FLAGS(2) → cubre toda la pantalla |
 | Coordenada Y | 8 bits (0-255) | pantalla 240 → sobra |
 | Sprites por línea | **8 (máximo del chip)** | Más → `OVERFLOW` y se pierde alguno. **8 es un límite duro de este bitstream** (ver nota abajo) |
-| Sprites (patrones) | **64** (0..63) | 8×8, 2bpp; el campo TILE es de 6 bits (§6.0). **0-2 los escribe el arranque** (ver nota abajo) |
+| Sprites (patrones) | **64** (0..63) | 8×8, 2bpp; el campo TILE es de 6 bits (§6.0). **Todos utilizables** (0-2 arrancan con arte de demo: sobrescribirlos) |
 | Patrones de fondo | 256 | comparte rango con la fuente (`$20`-`$7F`) |
 | Paletas de fondo / sprite | 4 / 4 | cada una de 4 colores; **escribibles** por el CPU (§4.4) |
 | Colores en pantalla | hasta 32 | 16 de fondo (4 paletas × 4) + 16 de sprite |
@@ -1433,13 +1453,14 @@ wait_setup:
 > unPlaced`). Para ampliarlo habría que **liberar CLS** de otro módulo (SD, SID,
 > UART) o migrar el line buffer a BSRAM (que también está al 100%).
 
-> **Sobre los patrones de sprite 0-2:** el arranque del core los **sobrescribe**
-> con tres formas de demo (cara, rombo, X). Si pides un setup por `$D816`, en su
-> lugar quedan **a cero**. Son patrones **del sistema**, no libres: si los usas,
-> se verán con esas formas o transparentes. Usa los patrones **3-63** para tu
-> propio arte. El resto de la secuencia de init **no toca** los patrones 3-63;
-> la expansión de la fuente escribe en los patrones de **fondo**, no en los de
-> sprite.
+> **Sobre los patrones de sprite 0-2:** el arranque del core los **inicializa**
+> con tres formas de demo (cara, rombo, X); tras un setup `$D816` quedan **a cero**.
+> No están reservados: **los 64 patrones (0-63) son utilizables**. Solo hay que
+> **sobrescribir 0-2** con el propio arte si se quieren usar, en vez de asumir que
+> arrancan vacíos. Las escrituras se ignoran mientras `init_done='0'`, así que hay
+> que esperar `VIDEO_READY` (bit 4 de `$D803`). Lo mismo aplica a los **tiles de
+> fondo 0-7**, que también vienen con texturas de demo.
+> Ver §6.0.
 
 > **Sobre `SCALE2X`:** es **duplicación de píxeles**, no composición. Un sprite
 > con el bit 4 de FLAGS activo se dibuja a **16×16** leyendo **un único patrón**
