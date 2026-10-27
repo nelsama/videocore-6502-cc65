@@ -738,9 +738,16 @@ El **scroll** desplaza la cámara sobre el mapa 64×32. Es global (por banda, ve
 - `$D804/$D805` = scroll X, en **píxeles lógicos**: 0..511 (bits 2:0 en `$D805`).
 - `$D806/$D807` = scroll Y, en **píxeles lógicos**: 0..255 (bits 2:0 en `$D807`).
 
-> Los registros almacenan 11 bits (0..2047), pero el mapa solo mide 64×32 tiles =
-> 512×256 px. **X envuelve módulo 512 y Y módulo 256**; los bits por encima de esos
-> rangos se ignoran.
+> Los registros almacenan **11 bits** (0..2047), pero el mapa mide 64×32 tiles =
+> 512×256 px. El scroll se **suma en 11 bits** y el exceso lo absorbe el módulo al
+> calcular la celda: **X envuelve módulo 512 y Y módulo 256**. Así, `512` equivale a
+> `0` en X y `256` a `0` en Y.
+>
+> Los valores fuera de rango **no se descartan**: entran en la suma y vuelven a caer
+> en el mapa por esa envoltura. Como 512 y 256 son múltiplos del tamaño del tile
+> (8), el resultado práctico coincide con haber escrito el valor reducido — pero
+> **conviene escribir siempre 0..511 en X y 0..255 en Y** para que el código
+> diga lo mismo que hace el hardware.
 
 ### 7.2 Mover la cámara
 
@@ -1070,9 +1077,26 @@ tilemap. Para cambiar el color de un texto, escribe el **atributo** de la celda:
   siguiente VBLANK.
 - **No hay filtro por `Y`:** el barrido recorre los **32 sprites**, incluidos los que
   están en `Y ≥ 248` (que sí están deshabilitados para *dibujar*, ver §6.1).
-- **No hay recorte a la pantalla:** la celda puede caer fuera del área visible, o
-  incluso envolver de la fila 31 a la fila 0 si el sprite está en `Y ≈ 255`
-  (ver §10.3).
+- **El scroll SÍ se aplica** (desde v2.9): el barrido suma `scroll_x`/`scroll_y` a la
+  posición del sprite antes de calcular la celda, exactamente igual que el dibujado.
+  El punto de colisión cae sobre la **misma celda que se ve en pantalla**.
+- **No hay recorte a la pantalla:** la celda es la del **mapa** (64×32), no la de la
+  pantalla. Con scroll, un punto fuera del área visible apunta a la celda del mapa
+  que tocaría ver; sin scroll, puede caer fuera de las 40 columnas visibles.
+
+> ⚠️ **Limitación con split de raster (§8):** el hardware tiene **un solo** par
+> `scroll_x`/`scroll_y`, que se reescribe en cada transición de banda. El barrido de
+> colisión corre en el VBLANK, **un único instante**, y usa el valor que quedó tras
+> dibujar la **última banda** de la pantalla (la INFERIOR si hay split).
+>
+> Como los 32 sprites pueden estar repartidos entre las tres bandas, y cada banda
+> tiene su propio scroll, **no hay un único scroll correcto para todos**. Resultado:
+> con split activo, solo los sprites de la última banda colisionan bien; los de las
+> demás lo hacen contra la celda que les correspondería con el scroll de esa última
+> banda.
+>
+> **Recomendación:** no combines `SOLID_HIT` con split de raster. Sin split (scroll
+> único) la colisión es exacta.
 
 ### 10.2 Marcar una celda sólida
 
@@ -1116,27 +1140,27 @@ tilemap. Para cambiar el color de un texto, escribe el **atributo** de la celda:
 > Al escribir siempre dx/dy en escala 0-7 obtienes el mismo punto lógico en ambas
 > escalas; el hardware hace la conversión.
 
-#### Sin recorte a la pantalla, y desbordamiento
+#### Sin recorte a la pantalla
 
-El punto se calcula en el dominio de la pantalla **y la celda se toma después**, sin
-comprobar que esté dentro de los 320×240 visibles:
+El punto se calcula en el dominio de la pantalla, se le **suma el scroll** y **después**
+se toma la celda, sin comprobar que el punto esté dentro de los 320×240 visibles:
 
-- **Sin recorte horizontal:** la pantalla tiene 40 columnas (0-39), pero el mapa
-  tiene 64. Un sprite en `X = 316` con `dx = 7` da punto 323 → **celda 40**, que está
-  **fuera de pantalla pero es una celda válida del mapa**. Si ahí hay algo sólido,
-  el sprite “colisiona” sin que se vea nada.
-- **Desbordamiento vertical:** `X` es de **9 bits** pero `Y` de **8**. La suma envuelve:
+- **Horizontalmente:** la pantalla tiene 40 columnas, pero el mapa tiene 64. Sin
+  scroll, un sprite en `X = 316` con `dx = 7` da punto 323 → **celda 40**, fuera de
+  pantalla pero válida en el mapa. Si ahí hay algo sólido, el sprite “colisiona” sin
+  que se vea nada. Con scroll, el envolvente es el propio mapa (64 columnas).
+- **Verticalmente:** el mapa tiene 32 filas y `Y` es de 8 bits, así que la suma
+  envuelve módulo 256 en lugar de saturar:
 
-| Sprite | `COLL_POINT` | Punto | Celda resultante |
-|--------|--------------|-------|------------------|
-| `Y = 240` | `$3F` (15,15) | (15, 255) | fila 31 (correcto) |
-| `Y = 248` | `$24` (4,4) | (4, 252) | fila 31 (correcto) |
-| `Y = 255` | `$27` (7,7) | (7, **6**) | fila **0** ← **envuelve** |
+| Sprite | `COLL_POINT` | Punto (pantalla) | `+scroll_y` | Celda |
+|--------|--------------|------------------|-------------|-------|
+| `Y = 240` | `$3F` (15) | 255 | `255+s` | `(255+s)/8 mod 32` |
+| `Y = 255` | `$27` (7) | **6** ← envuelve | `6+s` | fila de `6+s` |
 
-> ⚠️ Es consecuencia de la aritmética módulo del hardware, **no un bug**: `255 + 7`
-> da `262 & 0xFF = 6`. Un sprite que sale por abajo puede colisionar con una celda
-> sólida de la **fila superior**. Si un sprite va a salir de pantalla, no confíes en
-> su `SOLID_HIT`.
+> ⚠️ `255 + 7 = 262`, que en 8 bits es **6**. Esto ocurre **antes** de sumar el
+> scroll, así que no lo corrige: un sprite que sale por abajo (punto > 255) puede
+> colisionar con una celda de la **fila superior** del mapa. Si un sprite va a salir
+> de pantalla, no confíes en su `SOLID_HIT`.
 
 ### 10.4 Patrón de uso (varios sprites: deducción en software)
 
@@ -1476,6 +1500,7 @@ wait_setup:
 | Colisión sprite↔sprite | **no hay** | hacer por software (comparar X/Y) |
 | Colisión sprite↔tile | flag **global** | no dice qué sprite; deducir por software |
 | COLL_POINT | dx, dy **0-7** | auto-escala a 0-15 si el sprite es 2× |
+| Colisión y scroll | usa el scroll de la **última banda** dibujada | con split de raster solo acierta en esa banda; no mezclar con `SOLID_HIT` (§10.1) |
 | Rotación de sprites | **no hay** | usar sprites pre-rotados |
 | Setup de VRAM (`$D816`) | limpia + re-expande fuente | ~120-275 µs; durante `BUSY` se ignoran escrituras CPU a VRAM/OAM |
 | Overscan del monitor | variable | las filas 0 y 29 pueden recortarse según el monitor |
