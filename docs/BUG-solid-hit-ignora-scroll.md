@@ -60,6 +60,62 @@ Arreglarlo de verdad requeriría guardar la banda por sprite en el line buffer
 
 ---
 
+## Verificación en emulador
+
+Tras actualizar core y emulador se comprobó el comportamiento con la demo
+(`examples/demo`), que es el caso más exigente: **scroll horizontal continuo**
+(`vc_set_scroll_x` avanza 1 px por frame) más colisión sprite↔tile por hardware.
+
+### Montaje
+
+1. Emulador con el servidor de depuración:
+   ```powershell
+   Start-Process -FilePath '.\emulador.exe' `
+     -ArgumentList 'rom\monitor.bin','4000','tarjeta.img','--debug=8080' `
+     -WorkingDirectory 'D:\Proyectos\EmuladorFpga6502'
+   ```
+2. Demo en la SD y arranque por el **endpoint HTTP** (no abriendo el socket 4000,
+   que reinicia el monitor):
+   ```
+   curl "http://127.0.0.1:8080/sdcard/remount"
+   curl "http://127.0.0.1:8080/uart?cmd=LOAD%20DEMO.BIN%200800"
+   curl "http://127.0.0.1:8080/uart?cmd=R%200800"
+   ```
+3. Sondeo en bucle de `/vram.json` (OAM y texto del HUD) y de `/screen.png`
+   (píxeles reales).
+
+### Resultados
+
+- **Medición por estado (~15 min de ejecución):** el flag `SOLID_HIT` solo se
+  activa con el jugador en la banda vertical de la plataforma (`y = 150-152`
+  posado encima, o `y = 168-169` golpeando por debajo). Con el core anterior se
+  activaba con **cualquier** `y`.
+- **Capturas sincronizadas:** se revisaron fotograma a fotograma los instantes de
+  contacto. **Todos** corresponden a un solapamiento real con la plataforma,
+  incluido el caso límite del extremo derecho (el sprite tocaba con **2 px** de
+  su borde izquierdo, que a simple vista parece un fallo y no lo es).
+- **Sin falsos positivos observados** una vez descartado el caso anterior.
+
+### Precauciones al reproducir la prueba
+
+> ⚠️ **El indicador de la demo se mantiene varios frames** (`HIT_HOLD`). Si
+> muestreas el flag suelto y comparas con la posición en ese momento, casi todo
+> parece un falso positivo: el jugador **ya se ha desplazado** del punto de
+> contacto. Hay que mirar el **primer** frame de cada episodio, no cualquiera.
+
+> ⚠️ **La captura y la lectura de OAM no son atómicas.** A 3.375 MHz el jugador
+> cambia de posición entre ambas peticiones, así que cruzarlas puede dar
+> discrepancias de varios píxeles. Es preferible decidir sobre los **píxeles de
+> `/screen.png`** (jugador y plataforma en la misma imagen) que sobre la OAM.
+
+> ℹ️ **El emulador no expone el scroll.** `/ram.bin` devuelve solo los 16 KB de
+> RAM y `/state.txt` no incluye `$D804-$D807`, así que la celda que calcula el
+> hardware **no se puede leer directamente**. La comprobación es, por tanto,
+> **geométrica sobre la imagen** (que el sprite y la plataforma se toquen), no
+> sobre la celda del barrido.
+
+---
+
 ## Lecciones aplicables a la biblioteca
 
 - La biblioteca **no** necesita cambios: `vc_solid_hit()` solo expone el registro.
@@ -79,3 +135,4 @@ Arreglarlo de verdad requeriría guardar la banda por sprite en el line buffer
 | — | Documentado aquí y reportado |
 | `cc645d3` | **Corregido en el core** (+4 CLS) |
 | `2182323`+ | Emulador actualizado; manual v2.9 con el aviso del split |
+| — | Verificado en emulador con la demo (scroll activo): sin falsos positivos |

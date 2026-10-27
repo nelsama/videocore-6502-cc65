@@ -27,7 +27,8 @@ solo el registro de cambios.
   pantalla. **Corregido en el core `cc645d3` (v2.9)** y replicado en el emulador:
   ahora la celda se calcula con el scroll aplicado. Limitación residual: con **split
   de raster** el hardware tiene un único scroll, así que la colisión solo es exacta
-  en la última banda dibujada (manual §10.1).
+  en la última banda dibujada (manual §10.1). Incluye el procedimiento de
+  **verificación en emulador** (demo con scroll activo, sin falsos positivos).
 
 - **Manual del core actualizado a la revisión vigente (v2.9).** Copiado desde el
   proyecto FPGA (`fpga-6502-16k`). Novedades relevantes:
