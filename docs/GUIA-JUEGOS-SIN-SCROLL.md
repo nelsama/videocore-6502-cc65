@@ -336,6 +336,18 @@ if (board[celda(y)][celda(x)] == MURO) { /* choque */ }
   cuál**. Para saber quién chocó, compara en software (regla 4.2).
 - Se evalúa **una vez por VBLANK**; hay 1 frame de latencia.
 
+> ⚠️ **Tres trampas de este mecanismo** (manual §6.1 y §10):
+> 1. **`Y ≥ 248` no desactiva la colisión**, solo el dibujado: el barrido recorre los
+>    32 sprites. `vc_sprite_disable()` y `vc_clear_oam()` limpian el `COLL_POINT` para
+>    evitarlo; si aparcas sprites a mano, hazlo tú.
+> 2. **No hay recorte a pantalla:** un sprite en el borde derecho puede colisionar con
+>    la celda 40 (fuera de vista pero válida en el mapa).
+> 3. **`Y = 255` desborda:** `255 + dy` envuelve a la fila 0. Un objeto que sale por
+>    abajo puede “chocar” con algo sólido de arriba.
+>
+> Por estas trampas, **muchos juegos hacen la colisión sprite↔tile en software**
+> (regla 4.2) y no usan `vc_solid_hit()`. Es la opción más predecible.
+
 ---
 
 # 5. Los cinco arquetipos (elige el más cercano y adáptalo)

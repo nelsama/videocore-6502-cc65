@@ -332,8 +332,20 @@ vc_sprite16_set(first, x, y, tile0, flags);      /* objeto 16x16 (4 sprites)*/
 Flags: `VC_SPR_FLIP_Y`, `VC_SPR_FLIP_X`, `VC_SPR_PRIO`, `VC_SPR_SCALE2X`,
 `VC_SPR_XBIT8`, paletas `VC_SPPAL_*`.
 
-Puntos de colisión: `VC_COLL_CENTER`, `VC_COLL_FEET`, `VC_COLL_HEAD`,
-`VC_COLL_LEFT`, `VC_COLL_RIGHT`, o `VC_COLL_POINT(dx,dy)`.
+Puntos de colisión: `VC_COLL_TOPLEFT`, `VC_COLL_CENTER`, `VC_COLL_FEET`,
+`VC_COLL_HEAD`, `VC_COLL_LEFT`, `VC_COLL_RIGHT`, o `VC_COLL_POINT(dx,dy)`.
+
+> ⚠️ **`Y ≥ 248` solo desactiva el *dibujado*, NO la colisión.** El barrido del
+> hardware recorre los 32 sprites sin filtrar por `Y`, así que un sprite “aparcado”
+> puede seguir activando `vc_solid_hit()`. Por eso `vc_sprite_disable()` y
+> `vc_clear_oam()` **también ponen el `COLL_POINT` a `0`**. Si aparcas sprites a mano
+> (escribiendo `Y` con `vc_oam_put`), limpia tú el campo `VC_OAM_COLL`.
+>
+> ⚠️ **Sin recorte a pantalla (manual §10.3):** la celda de colisión se calcula sin
+> comprobar que esté en los 320×240 visibles. Un sprite pegado al borde derecho
+> (`X ≈ 316`, `dx = 7`) puede “colisionar” con la celda 40 (fuera de pantalla pero
+> válida en el mapa). Y en vertical, `Y = 255` con `dx=7,dy=7` **envuelve** a la
+> fila 0 (`255 + 7 → 6`). No confíes en `vc_solid_hit()` si el sprite va a salir.
 
 > La coordenada X es de **9 bits (0-511)**. `vc_sprite_move()` calcula el bit 8
 > automáticamente a partir de la X de 16 bits.

@@ -793,12 +793,25 @@ _vc_clear_oam:
         asl a
         clc
         adc VC_TMP             ; *5
+        sta VC_FIELD           ; base = sprite*5
+        ; --- campo Y (+1) = 248 (no se dibuja) ---
         clc
         adc #1                 ; campo Y
         sta VID_ADDR_LO
         lda #AREA_OAM
         sta VID_ADDR_HI
         lda #248
+        sta VID_DATA
+        ; --- campo COLL (+4) = 0 (neutro) ---
+        ; El barrido de colision NO filtra por Y: un sprite aparcado podria
+        ; activar SOLID_HIT si su COLL_POINT cae sobre una celda solida.
+        lda VC_FIELD
+        clc
+        adc #4                 ; campo COLL
+        sta VID_ADDR_LO
+        lda #AREA_OAM
+        sta VID_ADDR_HI
+        lda #0
         sta VID_DATA
         inc VC_SPRIDX
         lda VC_SPRIDX

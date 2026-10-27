@@ -17,6 +17,9 @@ solo el registro de cambios.
 
 ### Añadido
 
+- **`VC_COLL_TOPLEFT`** (`$00`, esquina superior izquierda). El manual lo documenta en
+  la tabla de `COLL_POINT` y sirve como punto "neutro".
+
 - **Manual del core actualizado a la revisión vigente (v2.8).** Copiado desde el
   proyecto FPGA (`fpga-6502-16k`). Novedades relevantes:
   - §2.5: registro de sistema `$C004` (`USER_FLAG`, fuera del dominio de reset;
@@ -26,6 +29,10 @@ solo el registro de cambios.
     sobrescriben. El setup los deja a cero. Lo mismo con los **tiles de fondo 0-7**.
   - §6.2b: `SCALE2X` **duplica píxeles de un solo patrón** (no compone 4 cuadrantes).
   - §4.4: el auto-incremento de `PAL_PTR` **satura en 31**.
+  - §6.1 y §10.1: `Y ≥ 248` **solo desactiva el dibujado**; el barrido de colisión
+    **no filtra por `Y`**, así que un sprite aparcado puede activar `SOLID_HIT`.
+  - §10.3: el cálculo de celda **no recorta a pantalla** y `Y = 255` **desborda**
+    (`255 + dy` envuelve a la fila 0).
   - Confirmado como límite duro de hardware: **8 sprites por línea**.
 
 - **Guía de juegos sin scroll (`docs/GUIA-JUEGOS-SIN-SCROLL.md`).** Documento
@@ -84,6 +91,20 @@ solo el registro de cambios.
   y toda la documentación.
 
 ### Corregido
+
+- **`vc_sprite_disable()` y `vc_clear_oam()` limpian ahora el `COLL_POINT`.** El manual
+  actualizado confirmó que **`Y ≥ 248` solo desactiva el dibujado**: el barrido de
+  colisión recorre los 32 sprites **sin filtrar por `Y`**, así que un sprite
+  "aparcado" podía seguir activando `SOLID_HIT` si su `COLL_POINT` caía sobre una
+  celda sólida.
+
+  - `vc_sprite_disable(spr)` → escribe `Y = 248` **y** `COLL = $00`.
+  - `vc_clear_oam()` → escribe `Y = 248` **y** `COLL = $00` en los 32 sprites.
+  - **Coste:** +1 escritura OAM por sprite (+18 bytes en `video.s`). Sin cambios de
+    firma: compatible.
+  - **Riesgo detectado:** `demo` lee `vc_solid_hit()` y tiene la fila 31 completa como
+    sólida, justo donde caen los sprites aparcados. Los otros ejemplos y **ningún
+    juego de `juegos_6502/`** estaban afectados (ninguno lee `SOLID_HIT`).
 
 - **Ejemplos movidos a patrones de sprite ≥ 3.** `demo`, `collision` y `palette`
   usaban los patrones 0-2 (que arrancan con arte de demo del core). No es

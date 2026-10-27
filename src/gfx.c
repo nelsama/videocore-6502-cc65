@@ -72,8 +72,17 @@ void vc_free_cell(uint8_t col, uint8_t row) {
  * ========================================================================= */
 
 /* Deshabilita un sprite (Y fuera de rango). */
+/* Deshabilita un sprite: deja de dibujarse.
+ *
+ * IMPORTANTE: poner Y >= 248 solo desactiva el DIBUJADO. El barrido de colision
+ * del hardware recorre los 32 sprites SIN filtrar por Y, asi que un sprite
+ * "aparcado" puede seguir activando SOLID_HIT si su COLL_POINT cae sobre una
+ * celda solida. Por eso aqui tambien se apunta el COLL_POINT a (0,0), que cae en
+ * la esquina de su celda y reduce (no elimina del todo) las colisiones falsas.
+ * Ver manual del core, seccion 6.1 y 10.1. */
 void vc_sprite_disable(uint8_t spr) {
     vc_oam_put(spr, VC_OAM_Y, VC_SPR_DISABLED);
+    vc_oam_put(spr, VC_OAM_COLL, VC_COLL_POINT(0, 0));
 }
 
 /*

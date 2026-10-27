@@ -228,6 +228,7 @@ void     vc_set_bgcolor(uint16_t rgb444);
 #define VC_OAM_COLL           4
 
 /* Puntos de colisión predefinidos (para COLL_POINT, offset 0-7) */
+#define VC_COLL_TOPLEFT       0x00  /* dx=0, dy=0  -> esquina sup-izq         */
 #define VC_COLL_CENTER        0x24  /* dx=4, dy=4  → centro                   */
 #define VC_COLL_FEET          0x3C  /* dx=4, dy=7  → pie                      */
 #define VC_COLL_HEAD          0x04  /* dx=4, dy=0  → cabeza                   */

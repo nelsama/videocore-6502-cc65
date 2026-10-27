@@ -571,7 +571,7 @@ Apéndice A.1):
 | Offset | Campo |
 |--------|-------|
 | +0 | `X` (bits 0-7 de la X de 9 bits) |
-| +1 | `Y` (0-255). **Y ≥ 248 = deshabilitado** |
+| +1 | `Y` (0-255). **Y ≥ 248 = deshabilitado para dibujar** (ver nota) |
 | +2 | `TILE` (**0-63**; 6 bits, ver §6.0) |
 | +3 | `FLAGS` (incluye el bit 8 de X) |
 | +4 | `COLL_POINT` |
@@ -587,6 +587,12 @@ Apéndice A.1):
 - Prioridad entre sprites: **menor índice de OAM gana**.
 
 **Dirección del byte en el OAM:** `sprite*5 + offset` (sprite 0..31 → byte 0..159).
+
+> ⚠️ **`Y ≥ 248` solo desactiva el dibujado.** El barrido de colisión (§10) recorre
+> los 32 sprites **sin filtrar por Y**, así que un sprite “aparcado” en `Y = 248`
+> **puede activar `SOLID_HIT`** si su `COLL_POINT` cae sobre una celda sólida. Si
+> deshabilitas sprites aparcándolos, pon también su `COLL_POINT` en `$00` sobre una
+> zona no sólida, o asigna a las celdas de destino un atributo sin el bit 4.
 
 ### 6.2 Coordenada X de 9 bits
 
@@ -1062,6 +1068,11 @@ tilemap. Para cambiar el color de un texto, escribe el **atributo** de la celda:
   en RAM del OAM, **escríbelo en el mismo VBLANK**.
 - **Leer `$D803` no limpia `SOLID_HIT`**; el bit refleja el frame en curso hasta el
   siguiente VBLANK.
+- **No hay filtro por `Y`:** el barrido recorre los **32 sprites**, incluidos los que
+  están en `Y ≥ 248` (que sí están deshabilitados para *dibujar*, ver §6.1).
+- **No hay recorte a la pantalla:** la celda puede caer fuera del área visible, o
+  incluso envolver de la fila 31 a la fila 0 si el sprite está en `Y ≈ 255`
+  (ver §10.3).
 
 ### 10.2 Marcar una celda sólida
 
@@ -1089,6 +1100,7 @@ tilemap. Para cambiar el color de un texto, escribe el **atributo** de la celda:
 
 | Punto | Byte | 1× alcanza (píxel) | 2× alcanza (píxel) |
 |-------|------|--------------------|--------------------|
+| esquina sup-izq | `$00` | 0 | 0 |
 | centro | `$24` | 4 | 8 |
 | pie | `$3C` | 7 | 15 |
 | cabeza | `$04` | 0 | 0 |
@@ -1103,6 +1115,28 @@ tilemap. Para cambiar el color de un texto, escribe el **atributo** de la celda:
 > del sprite ampliado, y los valores intermedios dan posiciones **pares** (`dx*2`).
 > Al escribir siempre dx/dy en escala 0-7 obtienes el mismo punto lógico en ambas
 > escalas; el hardware hace la conversión.
+
+#### Sin recorte a la pantalla, y desbordamiento
+
+El punto se calcula en el dominio de la pantalla **y la celda se toma después**, sin
+comprobar que esté dentro de los 320×240 visibles:
+
+- **Sin recorte horizontal:** la pantalla tiene 40 columnas (0-39), pero el mapa
+  tiene 64. Un sprite en `X = 316` con `dx = 7` da punto 323 → **celda 40**, que está
+  **fuera de pantalla pero es una celda válida del mapa**. Si ahí hay algo sólido,
+  el sprite “colisiona” sin que se vea nada.
+- **Desbordamiento vertical:** `X` es de **9 bits** pero `Y` de **8**. La suma envuelve:
+
+| Sprite | `COLL_POINT` | Punto | Celda resultante |
+|--------|--------------|-------|------------------|
+| `Y = 240` | `$3F` (15,15) | (15, 255) | fila 31 (correcto) |
+| `Y = 248` | `$24` (4,4) | (4, 252) | fila 31 (correcto) |
+| `Y = 255` | `$27` (7,7) | (7, **6**) | fila **0** ← **envuelve** |
+
+> ⚠️ Es consecuencia de la aritmética módulo del hardware, **no un bug**: `255 + 7`
+> da `262 & 0xFF = 6`. Un sprite que sale por abajo puede colisionar con una celda
+> sólida de la **fila superior**. Si un sprite va a salir de pantalla, no confíes en
+> su `SOLID_HIT`.
 
 ### 10.4 Patrón de uso (varios sprites: deducción en software)
 
