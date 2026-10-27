@@ -132,7 +132,7 @@ busques:
 | [`VIDEO-LIB.md`](docs/VIDEO-LIB.md) | **Referencia de la API** `vc_*`: sincronización, VRAM, sprites, colisión, scroll, texto, paletas, setup | necesitas la **firma exacta** de una función o constante |
 | [`07-MANUAL-PROGRAMACION.md`](docs/07-MANUAL-PROGRAMACION.md) | **Manual del core** (hardware): registros, direcciones, límites, mapa de memoria del vídeo | necesitas saber **cómo funciona el hardware** |
 | [`CHANGELOG.md`](docs/CHANGELOG.md) | Historial de cambios y correcciones de la biblioteca | quieres saber **qué cambió** y desde cuándo |
-| [`BUG-solid-hit-ignora-scroll.md`](docs/BUG-solid-hit-ignora-scroll.md) | Informe de un **fallo del core** (`vc_solid_hit()` ignora el scroll) | te afecta la colisión sprite↔tile con cámara |
+| [`BUG-solid-hit-ignora-scroll.md`](docs/BUG-solid-hit-ignora-scroll.md) | Informe de un **fallo del core ya corregido** (`vc_solid_hit()` ignoraba el scroll, core `cc645d3`) | quieres saber **por qué** la colisión sprite↔tile con cámara se comportaba raro antes de v2.9 |
 
 > **Ruta sugerida:** `CONCEPTOS-JUEGO` → `GUIA-JUEGOS-SIN-SCROLL` (o directo si ya
 > conoces los conceptos) → `VIDEO-LIB` como consulta → `07-MANUAL-PROGRAMACION`

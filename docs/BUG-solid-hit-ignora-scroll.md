@@ -1,117 +1,81 @@
-# Bug: el barrido de colisión sprite↔tile ignora el scroll
+# Bug (CORREGIDO): el barrido de colisión sprite↔tile ignoraba el scroll
 
-**Estado:** abierto — pendiente de analizar en el proyecto del core
+**Estado:** ✅ **corregido en el core** (`cc645d3`, core v2.9) y reflejado en el
+emulador.
 **Detectado en:** `fpga-6502-16k` (manual v2.8, `6502_board_v3`)
-**Encontrado por:** biblioteca `videocore-6502-cc65` mientras se validaba la demo
-en el emulador (`EmuladorFpga6502`).
-**Severidad:** media. No corrompe nada, pero hace que `SOLID_HIT` sea
-**inutilizable con scroll activo**, que es el caso de cualquier juego con cámara.
+**Encontrado por:** biblioteca `videocore-6502-cc65` al validar la demo en el
+emulador (`EmuladorFpga6502`).
 
 ---
 
 ## Resumen
 
-El **dibujado** aplica el scroll al calcular qué celda del tilemap se pinta en
-cada píxel de pantalla. El **barrido de colisión** **no** lo aplica: usa la
+El **dibujado** aplicaba el scroll al calcular qué celda del tilemap se pinta en
+cada píxel de pantalla. El **barrido de colisión** **no** lo aplicaba: usaba la
 posición del sprite como si el scroll fuera 0.
 
-Consecuencia: un sprite puede colisionar con una celda sólida **que no está
-debajo de él en pantalla**, y no colisionar con la que sí se ve.
+Consecuencia: un sprite podía colisionar con una celda sólida **que no estaba
+debajo de él en pantalla**, y no colisionar con la que sí se veía.
 
 ---
 
-## Evidencia en el código del emulador
+## Corrección
 
-El emulador (`src/video/video.cpp`) reproduce fielmente el RTL. Las dos rutas
-usan fórmulas distintas:
+**Core** (`cc645d3`, "Aplica el scroll en la colision sprite-tile"):
 
-**Dibujado** — sí aplica scroll:
+> *"El barrido de colisión usaba la posición de pantalla del sprite como si fuera
+> de mundo, así que con scroll activo leía una celda distinta de la que se ve bajo
+> el sprite. Ahora suma `scroll_x`/`scroll_y` antes de calcular la celda, igual
+> que el dibujado. Coste: +4 CLS, 0 registros nuevos."*
+
+**Emulador** (`2182323` y siguientes): aplica el mismo cálculo.
 
 ```cpp
-int map_x = (px + band_scroll_x) & 0x1FF; // envuelve módulo 512
-int map_y = (py + band_scroll_y) & 0xFF;  // envuelve módulo 256
+// antes:  celda = (px >> 3) ...
+// ahora:  wx = (px + scx) & 0x7FF;
+//         wy = (py + scy) & 0x7FF;
+//         celda = ((wy >> 3) & 0x1F) * MAP_W + ((wx >> 3) & 0x3F);
 ```
 
-**Barrido de colisión** — no lo aplica:
-
-```cpp
-const int px = (ox + dx) & 0x1FF;   // X del sprite + COLL_POINT
-const int py = (oy + dy) & 0xFF;    // Y del sprite + COLL_POINT
-const int celda = ((py >> 3) & 0x1F) * MAP_W + ((px >> 3) & 0x3F);
-if (attrib_[celda] & 0x10) hit = true;   // bit 4 = SOLIDO
-```
-
-El propio comentario de la función lo reconoce:
-
-> *"NO se aplica scroll: usa la celda directa de pantalla, no la del mapa."*
+El manual del core (v2.9, §10.1) ahora lo documenta explícitamente.
 
 ---
 
-## Cómo reproducirlo
+## Limitación que permanece (no es un bug)
 
-1. Un tilemap con una superficie sólida en una fila concreta (p. ej. fila 20,
-   columnas 4-27).
-2. Activar scroll horizontal: `vc_set_scroll_x(n)` con `n != 0`.
-3. Un sprite con `COLL_POINT` que caiga sobre esa fila.
-4. Leer `$D803` (bit 5, `SOLID_HIT`).
+**Con split de raster (§8), la colisión usa el scroll de una sola banda.**
 
-**Observado:** el flag se activa **cuando el sprite está encima de una celda del
-mapa que es sólida**, no cuando está encima de la superficie *visible*.
-Desplazando el scroll, el punto de colisión y la imagen **se desincronizan**.
+El hardware tiene **un único** par `scroll_x`/`scroll_y`, que se reescribe en cada
+transición de banda. El barrido corre en el VBLANK, en un único instante, y usa el
+valor que quedó tras dibujar la **última banda** (la INFERIOR si hay split).
 
-### Medición real (demo de la biblioteca, emulador)
+Como los 32 sprites pueden estar repartidos entre tres bandas con scroll distinto,
+**no existe un scroll válido para todos a la vez**. Con split activo, solo los
+sprites de la última banda colisionan correctamente.
 
-Con auto-scroll activo, correlacionando el rebote con la posición **visual** de
-la plataforma:
+Arreglarlo de verdad requeriría guardar la banda por sprite en el line buffer
+(cambio de core).
 
-```
-rebote en (22, 162)  →  plataforma visible en x=232..319   ← desfasado por completo
-rebote en (26, 173)  →  plataforma visible en x=0..113
-rebote en (12, 153)  →  plataforma visible en x=122..313
-```
-
-Con el scroll **desactivado**, los rebotes coinciden (`y≈150-154` sobre una
-plataforma en `y=160-167`): 4 rebotes correctos en 20 s.
+**Recomendación:** no combines `SOLID_HIT` con split de raster.
 
 ---
 
-## Impacto
+## Lecciones aplicables a la biblioteca
 
-- **`SOLID_HIT` no sirve con scroll.** Todo juego con cámara (el caso normal de
-  scroll) ve falseada la colisión sprite↔tile del hardware.
-- Coincide con la observación de que **todos los juegos reales** de
-  `juegos_6502/` (Arkanoid, Pacman, snake, Space Invaders, Tetris, RiverRaid)
-  hacen la colisión sprite↔tile **por software** y **ninguno** usa `vc_solid_hit()`.
-- El modo sin scroll (pantalla fija) **funciona bien**: ahí scroll = 0 y ambas
-  fórmulas coinciden.
+- La biblioteca **no** necesita cambios: `vc_solid_hit()` solo expone el registro.
+- `VIDEO-LIB.md` y la guía advierten ahora de la limitación con split de raster.
+- Sigue siendo válido que, en juegos con cámara compleja o bandas, la colisión
+  sprite↔tile **por software** es más predecible (es lo que hacen los juegos de
+  `juegos_6502/`).
 
 ---
 
-## Posibles correcciones (a valorar en el core)
+## Historial del hallazgo
 
-1. **Aplicar el scroll en el barrido**: sumar `scroll_x`/`scroll_y` (por banda,
-   si el sprite está en una banda concreta) antes de calcular la celda.
-   - Complica el barrido: hay que saber a qué banda pertenece el sprite según su
-     `Y` y usar el scroll de esa banda.
-2. **Documentar la limitación** y dejarlo como está, indicando que
-   `COLL_POINT`/`SOLID_HIT` son solo para pantalla fija.
-3. **Ofrecer ambos modos** con un bit de configuración (p. ej. en un registro
-   libre): "colisión con scroll / sin scroll".
-
----
-
-## Documentación a actualizar
-
-El manual (§10.1 y §10.3) describe la falta de recorte a pantalla y el
-desbordamiento de `Y`, pero **no menciona que el scroll se ignora**. Habría que
-añadir un aviso explícito, independientemente de si se corrige el RTL.
-
----
-
-## Notas
-
-- **No es un bug del emulador**: reproduce el RTL, y su propia prueba
-  (`tools/test_video.cpp`) cubre la colisión sin scroll.
-- **No es un bug de la biblioteca**: `vc_solid_hit()` solo expone el registro.
-- La biblioteca debería **advertir** en su documentación que no use `SOLID_HIT`
-  cuando haya scroll.
+| Fecha | Hecho |
+|---|---|
+| — | Detectado en la demo: la plataforma "rebotaba" con el jugador lejos |
+| — | Confirmado en el emulador: barrido sin `scroll_x`/`scroll_y` |
+| — | Documentado aquí y reportado |
+| `cc645d3` | **Corregido en el core** (+4 CLS) |
+| `2182323`+ | Emulador actualizado; manual v2.9 con el aviso del split |

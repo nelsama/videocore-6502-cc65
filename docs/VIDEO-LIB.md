@@ -347,17 +347,16 @@ Puntos de colisión: `VC_COLL_TOPLEFT`, `VC_COLL_CENTER`, `VC_COLL_FEET`,
 > válida en el mapa). Y en vertical, `Y = 255` con `dx=7,dy=7` **envuelve** a la
 > fila 0 (`255 + 7 → 6`). No confíes en `vc_solid_hit()` si el sprite va a salir.
 
-> 🔴 **`vc_solid_hit()` IGNORA EL SCROLL.** El barrido del hardware calcula la celda
-> como `(Y+dy)/8*64 + (X+dx)/8`, **sin restar** `scroll_x`/`scroll_y`, mientras que
-> el **dibujado sí aplica el scroll**. Con scroll activo, el punto de colisión y la
-> imagen **se desincronizan**: el flag se activa con celdas sólidas que no están
-> debajo del sprite en pantalla. Por tanto:
+> **CORREGIDO (v2.9) — el scroll se aplica igual que en el dibujado.** El barrido
+> calcula la celda con `(X+dx+scroll_x)` y `(Y+dy+scroll_y)`, así que el flag se
+> dispara justo con la celda que se ve debajo del sprite.
 >
-> - Con **scroll activo** → haz la colisión sprite↔tile **por software** (regla
->   habitual en los juegos reales).
-> - `vc_solid_hit()` solo es fiable con **pantalla fija** (scroll = 0).
+> ⚠️ **Única limitación: split de raster.** En el hardware el scroll es **una sola
+> señal**: si usas bandas con scroll distinto (manual §11), la colisión usa el
+> scroll de la **última banda dibujada** y solo acierta en esa. Sin split, es exacta.
 >
-> Detalle y reproducción en [`BUG-solid-hit-ignora-scroll.md`](BUG-solid-hit-ignora-scroll.md).
+> Historia del fallo y su corrección en
+> [`BUG-solid-hit-ignora-scroll.md`](BUG-solid-hit-ignora-scroll.md).
 
 > La coordenada X es de **9 bits (0-511)**. `vc_sprite_move()` calcula el bit 8
 > automáticamente a partir de la X de 16 bits.

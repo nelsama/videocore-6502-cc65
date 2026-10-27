@@ -10,7 +10,7 @@ solo el registro de cambios.
 
 ## [Sin publicar]
 
-> **Alineado con:** Manual de Programación del Core de Vídeo **v2.8**
+> **Alineado con:** Manual de Programación del Core de Vídeo **v2.9**
 > (hardware de referencia `6502_board_v3`, con **setup de VRAM por hardware**). Ver
 > [`07-MANUAL-PROGRAMACION.md`](07-MANUAL-PROGRAMACION.md). Al recompilar el core,
 > revisa esa versión antes de dar por buena esta de la librería.
@@ -21,13 +21,15 @@ solo el registro de cambios.
   la tabla de `COLL_POINT` y sirve como punto "neutro".
 
 - **Informe de bug del core: `docs/BUG-solid-hit-ignora-scroll.md`.** Documenta que el
-  barrido de colisión sprite↔tile **ignora el scroll** (`celda = (X+dx)/8` sin restar
-  `scroll_x`), mientras que el dibujado **sí** lo aplica. Con scroll activo,
-  `vc_solid_hit()` se dispara con celdas que no están debajo del sprite en pantalla.
-  Incluye evidencia en el código del emulador, reproducción y mediciones reales.
-  **Pendiente de analizar en el proyecto del core.**
+  barrido de colisión sprite↔tile **ignoraba el scroll** (`celda = (X+dx)/8` sin
+  sumar `scroll_x`), mientras que el dibujado **sí** lo aplica. Con scroll activo,
+  `vc_solid_hit()` se disparaba con celdas que no estaban debajo del sprite en
+  pantalla. **Corregido en el core `cc645d3` (v2.9)** y replicado en el emulador:
+  ahora la celda se calcula con el scroll aplicado. Limitación residual: con **split
+  de raster** el hardware tiene un único scroll, así que la colisión solo es exacta
+  en la última banda dibujada (manual §10.1).
 
-- **Manual del core actualizado a la revisión vigente (v2.8).** Copiado desde el
+- **Manual del core actualizado a la revisión vigente (v2.9).** Copiado desde el
   proyecto FPGA (`fpga-6502-16k`). Novedades relevantes:
   - §2.5: registro de sistema `$C004` (`USER_FLAG`, fuera del dominio de reset;
     **no** es un registro de vídeo, así que **no** entra en esta API).
