@@ -345,6 +345,11 @@ if (board[celda(y)][celda(x)] == MURO) { /* choque */ }
 > 3. **`Y = 255` desborda:** `255 + dy` envuelve a la fila 0. Un objeto que sale por
 >    abajo puede “chocar” con algo sólido de arriba.
 >
+> **Regla derivada:** nunca marques como sólida la **fila 31** (ni la 30 si puedes
+> evitarlo). Los sprites aparcados (`Y = 248`) caen en la **fila 31**: si esa fila
+> tiene `VC_ATTR_SOLID`, el flag se activa de forma **permanente** por sprites que ni
+> siquiera se muestran. Marca sólidas solo las filas ocupables del juego.
+>
 > Por estas trampas, **muchos juegos hacen la colisión sprite↔tile en software**
 > (regla 4.2) y no usan `vc_solid_hit()`. Es la opción más predecible.
 

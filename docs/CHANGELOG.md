@@ -102,9 +102,14 @@ solo el registro de cambios.
   - `vc_clear_oam()` → escribe `Y = 248` **y** `COLL = $00` en los 32 sprites.
   - **Coste:** +1 escritura OAM por sprite (+18 bytes en `video.s`). Sin cambios de
     firma: compatible.
-  - **Riesgo detectado:** `demo` lee `vc_solid_hit()` y tiene la fila 31 completa como
-    sólida, justo donde caen los sprites aparcados. Los otros ejemplos y **ningún
-    juego de `juegos_6502/`** estaban afectados (ninguno lee `SOLID_HIT`).
+  - **Falso positivo encontrado en `demo`:** lee `vc_solid_hit()` y marcaba como
+    sólida la **fila 31**, que está fuera de pantalla pero es justo donde caen los
+    sprites aparcados (`Y = 248` → fila 31). Como el barrido no filtra por `Y`, el
+    flag se activaba de forma permanente. **Corregido en el ejemplo**: el suelo
+    sólido ahora es solo la fila 30 (la 31 sigue con tile visual, sin el bit).
+    Verificado contra el emulador (`test_video` cubre exactamente este caso).
+  - Los otros ejemplos y **ningún juego de `juegos_6502/`** estaban afectados
+    (ninguno de esos juegos lee `SOLID_HIT`).
 
 - **Ejemplos movidos a patrones de sprite ≥ 3.** `demo`, `collision` y `palette`
   usaban los patrones 0-2 (que arrancan con arte de demo del core). No es

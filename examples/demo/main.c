@@ -174,8 +174,12 @@ static void build_world(void) {
         }
     }
 
-    /* Suelo solido (colision) con paleta de terreno */
-    for (y = VC_MAP_ROWS - 2; y < VC_MAP_ROWS; y++) {
+    /* Suelo solido (colision) con paleta de terreno.
+     * Solo las filas VISIBLES (30). La fila 31 queda fuera de pantalla y es
+     * donde caen los sprites aparcados (Y = 248 -> fila 31): el barrido de
+     * colision del hardware NO filtra por Y, asi que marcarla solida haria que
+     * un sprite deshabilitado activara SOLID_HIT de forma permanente. */
+    for (y = VC_MAP_ROWS - 2; y < VC_MAP_ROWS - 1; y++) {
         for (x = 0; x < VC_MAP_COLS; x++) {
             vc_set_cell_attr(x, y, VC_BGPAL_1, VC_ATTR_SOLID);
         }
