@@ -348,7 +348,8 @@ if (board[celda(y)][celda(x)] == MURO) { /* choque */ }
 > 4. **Con split de raster no es fiable.** El hardware tiene **un solo** `scroll_x`
 >    (y `scroll_y`): la colisión usa el de la **última banda dibujada**. Si tu juego
 >    usa bandas con scroll distinto, haz la colisión sprite↔tile **por software**
->    (regla 4.2). Sin split, la colisión con scroll es exacta.
+>    (regla 4.2). Sin split, la colisión con scroll es exacta (verificado en
+>    emulador; con split se midió un desfase de 19 columnas).
 >
 > **Regla derivada:** nunca marques como sólida la **fila 31** (ni la 30 si puedes
 > evitarlo). Los sprites aparcados (`Y = 248`) caen en la **fila 31**: si esa fila

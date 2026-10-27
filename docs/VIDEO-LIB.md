@@ -354,6 +354,8 @@ Puntos de colisión: `VC_COLL_TOPLEFT`, `VC_COLL_CENTER`, `VC_COLL_FEET`,
 > ⚠️ **Única limitación: split de raster.** En el hardware el scroll es **una sola
 > señal**: si usas bandas con scroll distinto (manual §11), la colisión usa el
 > scroll de la **última banda dibujada** y solo acierta en esa. Sin split, es exacta.
+> Medido en emulador: sin split la celda coincide el 100% de las veces; con split
+> se observó un desfase de **19 columnas** (152 px) en la demo.
 >
 > Historia del fallo y su corrección en
 > [`BUG-solid-hit-ignora-scroll.md`](BUG-solid-hit-ignora-scroll.md).

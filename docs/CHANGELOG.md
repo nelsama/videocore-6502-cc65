@@ -28,7 +28,9 @@ solo el registro de cambios.
   ahora la celda se calcula con el scroll aplicado. Limitación residual: con **split
   de raster** el hardware tiene un único scroll, así que la colisión solo es exacta
   en la última banda dibujada (manual §10.1). Incluye el procedimiento de
-  **verificación en emulador** (demo con scroll activo, sin falsos positivos).
+  **verificación en emulador**: con split se midió un desfase de **19 columnas**
+  (152 px); con la prueba de control **sin split** la celda coincide en todas las
+  muestras estables, lo que confirma la corrección del core.
 
 - **Manual del core actualizado a la revisión vigente (v2.9).** Copiado desde el
   proyecto FPGA (`fpga-6502-16k`). Novedades relevantes:
