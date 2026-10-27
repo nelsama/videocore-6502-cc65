@@ -345,6 +345,12 @@ if (board[celda(y)][celda(x)] == MURO) { /* choque */ }
 > 3. **`Y = 255` desborda:** `255 + dy` envuelve a la fila 0. Un objeto que sale por
 >    abajo puede “chocar” con algo sólido de arriba.
 >
+> 🔴 **4. `vc_solid_hit()` IGNORA EL SCROLL.** El barrido del hardware calcula la
+> celda sin restar `scroll_x`/`scroll_y`, mientras que el dibujado sí aplica el
+> scroll. **Con scroll activo el flag se dispara con celdas que no están debajo del
+> sprite en pantalla.** Por eso, si tu juego tiene cámara, haz la colisión
+> sprite↔tile **por software** (regla 4.2). Sirve con **pantalla fija**.
+>
 > **Regla derivada:** nunca marques como sólida la **fila 31** (ni la 30 si puedes
 > evitarlo). Los sprites aparcados (`Y = 248`) caen en la **fila 31**: si esa fila
 > tiene `VC_ATTR_SOLID`, el flag se activa de forma **permanente** por sprites que ni

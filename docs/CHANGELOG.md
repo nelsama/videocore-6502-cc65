@@ -20,6 +20,13 @@ solo el registro de cambios.
 - **`VC_COLL_TOPLEFT`** (`$00`, esquina superior izquierda). El manual lo documenta en
   la tabla de `COLL_POINT` y sirve como punto "neutro".
 
+- **Informe de bug del core: `docs/BUG-solid-hit-ignora-scroll.md`.** Documenta que el
+  barrido de colisión sprite↔tile **ignora el scroll** (`celda = (X+dx)/8` sin restar
+  `scroll_x`), mientras que el dibujado **sí** lo aplica. Con scroll activo,
+  `vc_solid_hit()` se dispara con celdas que no están debajo del sprite en pantalla.
+  Incluye evidencia en el código del emulador, reproducción y mediciones reales.
+  **Pendiente de analizar en el proyecto del core.**
+
 - **Manual del core actualizado a la revisión vigente (v2.8).** Copiado desde el
   proyecto FPGA (`fpga-6502-16k`). Novedades relevantes:
   - §2.5: registro de sistema `$C004` (`USER_FLAG`, fuera del dominio de reset;

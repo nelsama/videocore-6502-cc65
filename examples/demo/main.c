@@ -108,6 +108,24 @@ static const uint8_t box_p1[4][8] = {
 #define SPR_RHOM      3     /* sprite 8x8 dibujado a 2x -> 16x16 */
 #define SPR_BLOCK     4     /* sprite base del bloque 16x16 (usa 4..7) */
 #define PLAYER_FRAMES 3
+/* Frames que el aviso de colision permanece encendido tras el contacto: el
+ * hardware solo lo levanta 1-2 frames y a simple vista no se veria. */
+#define HIT_HOLD      30
+
+/* Plataforma de ladrillo: fila 20 del tilemap (8 px por celda). */
+#define PLATAFORMA_FILA  20
+#define PLATAFORMA_PY   (PLATAFORMA_FILA * 8)   /* 160 px */
+#define PLATAFORMA_COL0  4                      /* primera columna */
+#define PLATAFORMA_COL1  28                     /* fin (exclusivo)  */
+/* Frames de bloqueo tras un rebote contra el solido, para no invertir varias
+ * veces con el mismo flag (dura el frame entero). */
+#define SOLID_LOCK_FRAMES 8
+
+/* Punto de colision "aparcado": con el sprite en Y=248 (deshabilitado), su
+ * COLL_POINT cae en la fila 31. Esa fila NO se marca nunca como solida, asi que
+ * estos sprites no pueden activar SOLID_HIT. vc_solid_hit() es GLOBAL: si el
+ * bloque o el rombo lo dispararan, el jugador rebotaria sin tocar nada. */
+#define COLL_APARCADO  VC_COLL_POINT(0, 0)
 
 /* Indices de PATRON de sprite (0-63).
  * Los patrones 0-2 arrancan con arte de demo del core (y el setup los deja a
@@ -129,7 +147,11 @@ static uint16_t rx, ry;      /* rombo 8x8 a 2x */
 static int8_t   rvx, rvy;
 
 static uint16_t scroll;      /* camara (auto-scroll del fondo) */
-static uint8_t  hit;         /* parpadeo al colisionar */
+static uint8_t  hit;         /* colision sprite<->sprite (cajas, software) */
+static uint8_t  hit_solid;   /* colision sprite<->tile SOLIDO (hardware)  */
+static uint8_t  hit_hold;    /* frames visibles del aviso HIT SOLID */
+static uint8_t  box_hold;    /* frames visibles del aviso HIT BOX   */
+static uint8_t  solid_lock;  /* antirrebote del choque con tile solido */
 
 /* ===========================================================================
  * CARGA DE ASSETS
@@ -215,13 +237,13 @@ static void init_hud(void) {
     /* HUD superior (fila 1; la 0 es margen). Paleta 0 (tinta clara por defecto). */
     vc_put_str_pal(1, 1, "CORE DE VIDEO  -  DEMO vc", VC_TINTA(VC_BGPAL_0));
 
-    /* HUD inferior (fila 28): texto a la izquierda en paleta 3,
-     * estado a la derecha (update_hud escribe en la columna 28). */
-    vc_put_str_pal(1, 28, "SPRITES 16x16 + 8x8@2x", VC_TINTA(VC_BGPAL_3));
+    /* HUD inferior (fila 28): texto decorativo a la izquierda; la posicion del
+     * jugador y el aviso de colision van a la derecha (update_hud). */
+    vc_put_str_pal(1, 28, "SPRITES 16x16", VC_TINTA(VC_BGPAL_3));
 }
 
 static void update_hud(void) {
-    /* Muestra la posicion del jugador y el flag de colision (columna 28) */
+    /* Posicion del jugador a la izquierda del HUD inferior. */
     char buf[9];
     uint16_t v = px;
 
@@ -230,11 +252,42 @@ static void update_hud(void) {
     buf[2] = (char)('0' + ((v / 100) % 10));
     buf[3] = (char)('0' + ((v / 10) % 10));
     buf[4] = (char)('0' + (v % 10));
-    buf[5] = ' ';
-    buf[6] = hit ? 'H' : ' ';
-    buf[7] = hit ? 'T' : ' ';
-    buf[8] = 0;
-    vc_put_str_pal(28, 28, buf, VC_TINTA(VC_BGPAL_3));
+    buf[5] = 0;
+    vc_put_str_pal(17, 28, buf, VC_TINTA(VC_BGPAL_3));
+
+    /* Indicador de colision sprite<->tile SOLIDO (vc_solid_hit).
+     * Se dibuja en la banda inferior (scroll fijo) en paleta 2 (blanco), que
+     * contrasta con el fondo azul, y se mantiene unos frames tras el contacto
+     * (HIT_HOLD): el hardware lo levanta solo 1-2 frames y a simple vista no
+     * se veria. */
+    if (hit_solid) {
+        hit_hold = HIT_HOLD;
+    } else if (hit_hold) {
+        hit_hold--;
+    }
+
+    if (hit_hold) {
+        /* Debe ir en la BANDA INFERIOR (scroll fijo, filas 27+): si se escribe
+         * por encima de RASTER_LINE1=216, pertenece a la banda media y el
+         * auto-scroll del mundo se lo lleva fuera de pantalla. */
+        vc_put_str_pal(20, 27, "HIT SOLID", VC_TINTA(VC_BGPAL_2));
+    } else {
+        vc_put_str_pal(20, 27, "         ", VC_TINTA(VC_BGPAL_2));
+    }
+
+    /* Indicador de colision sprite<->sprite (cajas, SOFTWARE: vc_box_overlap).
+     * Es la del bloque 16x16; distinta de la del tile solido. */
+    if (hit) {
+        box_hold = HIT_HOLD;
+    } else if (box_hold) {
+        box_hold--;
+    }
+
+    if (box_hold) {
+        vc_put_str_pal(30, 27, "HIT BOX", VC_TINTA(VC_BGPAL_1));
+    } else {
+        vc_put_str_pal(30, 27, "       ", VC_TINTA(VC_BGPAL_1));
+    }
 }
 
 /* ===========================================================================
@@ -249,8 +302,12 @@ static void move_player(void) {
     else if (px <= 8) { px = 8; vx = (int8_t)-vx; }
 
     py = (uint16_t)(py + vy);
+    /* Rebote vertical: techo = borde superior de la plataforma, suelo = borde
+     * inferior de la pantalla. Al tocar la plataforma (tile solido) el rebote
+     * lo resuelve vc_solid_hit() en update_frame; estos limites son la red de
+     * seguridad para que el jugador no salga de pantalla. */
     if (py >= 224) { py = 224; vy = (int8_t)-vy; }
-    else if (py <= 16)  { py = 16;  vy = (int8_t)-vy; }
+    else if (py <= 8) { py = 8; vy = (int8_t)-vy; }
 
     /* Animacion cada 6 frames */
     if (++tick >= 6) {
@@ -266,6 +323,8 @@ static void move_player(void) {
 /* Bloque 16x16 (4 sprites de 8x8 a 1x). */
 #define BLOCK_W 16
 static void move_block(void) {
+    uint8_t i;
+
     /* Suma con signo (bvx/bvy son int8_t). Un valor negativo debe RESTAR. */
     bx = (uint16_t)(bx + bvx);
     if (bx >= (312 - BLOCK_W)) { bx = 312 - BLOCK_W; bvx = (int8_t)-bvx; }
@@ -276,6 +335,13 @@ static void move_block(void) {
     else if (by <= 32) { by = 32; bvy = (int8_t)-bvy; }
 
     vc_sprite16_set(SPR_BLOCK, bx, by, PAT_BLOCK, VC_SPPAL_3);   /* 16x16 a 1x */
+
+    /* vc_sprite16_set deja COLL=centro en los 4 cuadrantes y el bloque cruza la
+     * fila de la plataforma: dispararia SOLID_HIT (global) y el jugador
+     * rebotaria sin tocar nada. Se aparca el COLL para que NO colisione. */
+    for (i = 0; i < 4; i++) {
+        vc_oam_put((uint8_t)(SPR_BLOCK + i), VC_OAM_COLL, COLL_APARCADO);
+    }
 }
 
 /* Rombo 8x8 dibujado a 2x -> 16x16 en pantalla. */
@@ -294,12 +360,50 @@ static void move_rhom(void) {
     vc_oam_put(SPR_RHOM, VC_OAM_TILE, PAT_RHOM);
 }
 
+/* La plataforma del tilemap ocupa las columnas 4..27 de la fila 20.
+ *
+ * OJO: el fondo tiene auto-scroll en X, asi que en PANTALLA la plataforma NO
+ * esta en x=32..223: aparece desplazada. El barrido de colision del hardware
+ * usa la celda de pantalla (no la del mapa), de modo que aqui hay que aplicar
+ * el mismo scroll para que la comprobacion coincida con lo que se ve.
+ *
+ *   x_pantalla = col*8 - scroll   (el mapa envuelve cada 512 px)
+ *
+ * Devuelve 1 si el jugador (8x8) esta tocando la plataforma EN PANTALLA. */
+static uint8_t jugador_sobre_plataforma(void) {
+    uint16_t sx0, sx1;   /* extremos de la plataforma en pantalla */
+
+    /* offset en pantalla de la columna 4 (inicio) y 28 (fin exclusivo),
+     * con la misma envoltura que hace el hardware (modulo 512). */
+    sx0 = (uint16_t)((uint16_t)(PLATAFORMA_COL0 * 8 + 512 - scroll) & 0x1FF);
+    sx1 = (uint16_t)((uint16_t)(PLATAFORMA_COL1 * 8 + 512 - scroll) & 0x1FF);
+
+    /* contacto vertical: tocando la cara superior o la inferior */
+    if (!(py + 8 >= PLATAFORMA_PY && py + 8 <= PLATAFORMA_PY + 8) &&
+        !(py >= PLATAFORMA_PY && py <= PLATAFORMA_PY + 8)) {
+        return 0;
+    }
+
+    /* contacto horizontal, teniendo en cuenta que la plataforma puede estar
+     * partida por la envoltura (sx1 < sx0) */
+    if (sx1 > sx0) {
+        return (uint8_t)(!(px + 8 <= sx0 || px >= sx1));
+    }
+    /* envuelta: dos tramos [sx0,512) y [0,sx1) */
+    return (uint8_t)((px + 8 > sx0) || (px < sx1));
+}
+
 static void update_frame(void) {
+    hit_solid = 0;      /* se recalcula cada frame */
+
     move_player();
     move_block();
     move_rhom();
 
-    /* auto-scroll suave del fondo */
+    /* Auto-scroll suave del fondo: la plataforma se mueve en pantalla.
+     * La colision contra el tile solido tiene en cuenta este scroll
+     * (ver jugador_sobre_plataforma), para que el rebote coincida con lo que
+     * se ve. */
     scroll = (uint16_t)((scroll + 1) & 0x01FF);
     vc_set_scroll_x(scroll);
 
@@ -319,9 +423,31 @@ static void update_frame(void) {
         }
     }
 
-    /* la colision contra tiles solidos la reporta el hardware */
-    if (vc_solid_hit()) {
-        hit = 1;
+    /* Colision sprite<->tile SOLIDO: el hardware la detecta (vc_solid_hit),
+     * pero el flag es GLOBAL: dice "alguien choco", no quien. Y en esta demo
+     * hay otro sprite (el rombo) que cruza la zona de la plataforma.
+     * Por eso se combinan las dos cosas:
+     *   1. el flag del hardware, y
+     *   2. una comprobacion en SOFTWARE de que el jugador esta de verdad sobre
+     *      la plataforma (columna y fila).
+     * Asi el rebote solo ocurre cuando es el jugador quien choca.
+     * solid_lock evita invertir varias veces con el mismo flag. */
+    if (vc_solid_hit() && jugador_sobre_plataforma()) {
+        hit_solid = 1;
+        if (!solid_lock) {
+            if (vy < 0) {
+                /* subiendo: choca con la cara INFERIOR -> lo empuja abajo */
+                py = (uint16_t)(PLATAFORMA_PY + 8);
+                vy = 1;
+            } else {
+                /* bajando: choca con la cara SUPERIOR -> lo posa encima */
+                py = (uint16_t)(PLATAFORMA_PY - 8);
+                vy = -1;
+            }
+            solid_lock = SOLID_LOCK_FRAMES;
+        }
+    } else if (solid_lock) {
+        solid_lock--;
     }
 
     update_hud();
@@ -389,7 +515,9 @@ int main(void) {
         s.y     = (uint8_t)ry;
         s.tile  = PAT_RHOM;
         s.flags = VC_SPPAL_1 | VC_SPR_SCALE2X;
-        s.coll  = VC_COLL_CENTER;
+        /* COLL aparcado: el rombo NO debe disparar SOLID_HIT (el flag es
+         * global y el jugador rebotaria sin tocar la plataforma). */
+        s.coll  = COLL_APARCADO;
         vc_sprite_set(SPR_RHOM, &s);
     }
 
