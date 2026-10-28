@@ -356,6 +356,10 @@ if (board[celda(y)][celda(x)] == MURO) { /* choque */ }
 > tiene `VC_ATTR_SOLID`, el flag se activa de forma **permanente** por sprites que ni
 > siquiera se muestran. Marca sólidas solo las filas ocupables del juego.
 >
+> `vc_sprite_disable()` deja `X = 0` justo para que ese punto caiga siempre en la
+> **fila 31, columna 0**, pero **no puede impedir** que marques la fila 31 como
+> sólida: eso lo decide tu juego.
+>
 > Por estas trampas, **muchos juegos hacen la colisión sprite↔tile en software**
 > (regla 4.2) y no usan `vc_solid_hit()`. Es la opción más predecible.
 

@@ -15,7 +15,24 @@ solo el registro de cambios.
 > [`07-MANUAL-PROGRAMACION.md`](07-MANUAL-PROGRAMACION.md). Al recompilar el core,
 > revisa esa versión antes de dar por buena esta de la librería.
 
+### Corregido
+
+- **`vc_sprite_disable()` no ponía `X = 0`.** Solo escribía `Y = 248` y `COLL = 0`, así
+  que el punto de colisión se quedaba en la **columna donde murió el sprite** (y con
+  `scroll_y ≠ 0` en la fila 0, que sí suele ser sólida). Ahora deja `X = 0`,
+  `Y = 248`, `FLAGS = 0` y `COLL = 0`: el punto cae en la fila 31, columna 0, fuera
+  de pantalla. Detectado al montar la demo como banco de pruebas de `vc_solid_hit()`.
+  Cubierto por `tests/disable_test.s`.
+
+- **`vc_solid_hit()` devolvía la máscara `$20`, no `0/1`.** Funcionaba en `if (…)`,
+  pero `== 1` nunca se cumplía. Ahora devuelve `0` o `1`. Si necesitas el byte
+  completo de `STATUS`, usa `vc_status()`.
+
 ### Añadido
+
+- **Test de regresión `tests/disable_test.s`** (añadido al `tests/run.sh`). Comprueba
+  qué escribe `vc_sprite_disable()` en el OAM. Enlaza `gfx.c` de verdad, así que si
+  la implementación cambia, el test lo detecta.
 
 - **`VC_COLL_TOPLEFT`** (`$00`, esquina superior izquierda). El manual lo documenta en
   la tabla de `COLL_POINT` y sirve como punto "neutro".

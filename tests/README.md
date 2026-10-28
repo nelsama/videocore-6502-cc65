@@ -16,6 +16,10 @@ que la demo rara vez toca:
   flags y `COLL_POINT` correctos.
 - Que `vc_oam_put(spr, field, data)` escriba **`data`** (no `spr`) — regresión del
   bug en que el campo `TILE` quedaba siempre a 0.
+- Que `vc_sprite_disable()` deje el sprite **inerte también para la colisión**:
+  `X = 0`, `Y = 248`, `FLAGS = 0` y `COLL = 0`. Sin `X = 0`, el `COLL_POINT` se
+  queda en la columna donde murió el sprite y puede disparar `SOLID_HIT` con
+  `scroll_y ≠ 0`.
 
 ## Ejecutar
 
@@ -41,6 +45,9 @@ del caso que falla).
   la dirección correcta del banco (`$C8`/`$E8`, `spr*8+fila`).
 - **`humano_test.s`** — comprueba que `vc_sprite_set` escribe los 5 campos y que
   el campo `TILE` recibe el valor correcto (dirección `spr*5 + 2`).
+- **`disable_test.s`** — enlaza **`gfx.c` de verdad** (compilado para sim65), no un
+  shim, y registra las escrituras OAM para verificar los 4 campos que
+  `vc_sprite_disable()` debe dejar a cero (o a `248` en `Y`).
 
 ## Añadir un test nuevo
 

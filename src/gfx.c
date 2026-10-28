@@ -72,16 +72,31 @@ void vc_free_cell(uint8_t col, uint8_t row) {
  * ========================================================================= */
 
 /* Deshabilita un sprite (Y fuera de rango). */
-/* Deshabilita un sprite: deja de dibujarse.
+/* Deshabilita un sprite: deja de dibujarse Y deja de colisionar.
  *
- * IMPORTANTE: poner Y >= 248 solo desactiva el DIBUJADO. El barrido de colision
- * del hardware recorre los 32 sprites SIN filtrar por Y, asi que un sprite
- * "aparcado" puede seguir activando SOLID_HIT si su COLL_POINT cae sobre una
- * celda solida. Por eso aqui tambien se apunta el COLL_POINT a (0,0), que cae en
- * la esquina de su celda y reduce (no elimina del todo) las colisiones falsas.
- * Ver manual del core, seccion 6.1 y 10.1. */
+ * Poner Y >= 248 solo desactiva el DIBUJADO. El barrido de colision del
+ * hardware recorre los 32 sprites SIN filtrar por Y, asi que un sprite
+ * "aparcado" sigue activando SOLID_HIT si su COLL_POINT cae sobre una celda
+ * solida. Ver manual del core, secciones 6.1 y 10.1.
+ *
+ * Por eso se dejan los CUATRO campos que deciden el punto de colision:
+ *   - Y = 248 y COLL = (0,0): el punto cae en la fila 31;
+ *   - X = 0 y FLAGS = 0 (sin bit 8): cae en la COLUMNA 0.
+ *
+ * Lo de X importa: si se dejara la X donde murio el sprite, el punto se
+ * quedaria en su columna, y con scroll_y != 0 en la fila 0, que SI suele ser
+ * solida. Dejar X=0 ata el punto a la fila 31, que esta fuera de pantalla.
+ *
+ * La OAM es de solo escritura (no se puede leer), asi que no hay forma de
+ * conservar la paleta ni SCALE2X al apagar: FLAGS se pone a 0. Para volver a
+ * dibujarlo, usa vc_sprite_set() o reescribe los campos con vc_oam_put().
+ *
+ * QUEDA UNA RESPONSABILIDAD DEL USUARIO: no marcar como solida la fila 31.
+ * El hardware no la excluye y la libreria no puede impedir que se marque. */
 void vc_sprite_disable(uint8_t spr) {
+    vc_oam_put(spr, VC_OAM_X, 0);
     vc_oam_put(spr, VC_OAM_Y, VC_SPR_DISABLED);
+    vc_oam_put(spr, VC_OAM_FLAGS, 0);
     vc_oam_put(spr, VC_OAM_COLL, VC_COLL_POINT(0, 0));
 }
 
@@ -99,9 +114,13 @@ void vc_sprite_disable(uint8_t spr) {
  * COLISIÓN
  * =========================================================================== */
 
-/* Flag global de colisión sprite↔tile sólido de este frame. */
+/* Flag global de colisión sprite↔tile sólido de este frame.
+ *
+ * Devuelve 0 o 1 (no la máscara 0x20): el bit vive en $D803, pero exponerlo
+ * así evita el error clásico de comparar con `== 1` y no saber por qué nunca
+ * entra. Si necesitas el byte completo de STATUS, usa vc_status(). */
 uint8_t vc_solid_hit(void) {
-    return (uint8_t)(vc_status() & VC_STATUS_SOLID_HIT);
+    return (uint8_t)((vc_status() & VC_STATUS_SOLID_HIT) ? 1 : 0);
 }
 
 /* Detección AABB genérica (sprite↔sprite, en software). */

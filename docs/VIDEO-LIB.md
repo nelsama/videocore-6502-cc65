@@ -338,8 +338,16 @@ Puntos de colisión: `VC_COLL_TOPLEFT`, `VC_COLL_CENTER`, `VC_COLL_FEET`,
 > ⚠️ **`Y ≥ 248` solo desactiva el *dibujado*, NO la colisión.** El barrido del
 > hardware recorre los 32 sprites sin filtrar por `Y`, así que un sprite “aparcado”
 > puede seguir activando `vc_solid_hit()`. Por eso `vc_sprite_disable()` y
-> `vc_clear_oam()` **también ponen el `COLL_POINT` a `0`**. Si aparcas sprites a mano
-> (escribiendo `Y` con `vc_oam_put`), limpia tú el campo `VC_OAM_COLL`.
+> `vc_clear_oam()` **también ponen `X = 0`, `Y = 248`, `FLAGS = 0` y el `COLL_POINT`
+> a `0`**. Dejando `X = 0` el punto cae en la **fila 31, columna 0**, fuera de
+> pantalla; si se dejara la `X` donde murió el sprite, con `scroll_y ≠ 0` caería en
+> la fila 0, que sí suele ser sólida.
+>
+> Sigue siendo tu responsabilidad **no marcar la fila 31 como sólida**: el hardware
+> no la excluye.
+>
+> Si aparcas sprites a mano (escribiendo `Y` con `vc_oam_put`), limpia tú el campo
+> `VC_OAM_COLL` y la `X`.
 >
 > ⚠️ **Sin recorte a pantalla (manual §10.3):** la celda de colisión se calcula sin
 > comprobar que esté en los 320×240 visibles. Un sprite pegado al borde derecho
@@ -375,6 +383,20 @@ Puntos de colisión: `VC_COLL_TOPLEFT`, `VC_COLL_CENTER`, `VC_COLL_FEET`,
 > se repite). No lee `patron+1/+2/+3`. Para un 16×16 real (4 dibujos distintos) usa
 > **4 sprites** de 8×8 (lo que hace `vc_sprite16_set`). El sprite 2× sigue ocupando
 > **1 slot** de los 8 por línea.
+
+> ⚠️ **`vc_sprite16_set()` fija `COLL = centro` (`$24`) en los 4 cuadrantes.**
+> El centro **no es un punto neutro**: cae 4 px dentro del sprite y, si el objeto
+> 16×16 cruza una fila sólida, dispara `vc_solid_hit()`. Como el flag es global,
+> el rebote aparecería en **otro** sprite. Si ese objeto no debe colisionar,
+> aparca su `COLL` después de cada llamada:
+>
+> ```c
+> for (i = 0; i < 4; i++)
+>     vc_oam_put((uint8_t)(first + i), VC_OAM_COLL, VC_COLL_POINT(0, 0));
+> ```
+>
+> Y aun así su punto debe caer fuera de toda zona sólida: aparcar el `COLL` **no**
+> desactiva la colisión por sí solo.
 
 ### Animación
 
@@ -415,9 +437,13 @@ planos.
 if (vc_solid_hit()) { /* algún sprite tocó un tile sólido este frame */ }
 ```
 
-- `vc_solid_hit()` devuelve el flag **global** del hardware (no dice cuál sprite
-  chocó). Si tienes varios objetos, deduce cuál comparando su borde en RAM con la
-  pared y rebota solo ese. Para un único objeto colisionador, el flag basta.
+- `vc_solid_hit()` devuelve **`0` o `1`** (no la máscara `$20`) y es **global**:
+  no dice cuál sprite chocó. Si tienes varios objetos, deduce cuál comparando su
+  borde en RAM con la pared y rebota solo ese. Para un único objeto colisionador,
+  el flag basta.
+- Llega con **1 frame de latencia**: refleja el VBLANK anterior. Si tu sprite se
+  mueve rápido (2 px/frame o más), clasifica el choque con la posición del frame
+  anterior, no con la actual.
 
 **Colisión sprite↔sprite (software, núcleo en asm):**
 
