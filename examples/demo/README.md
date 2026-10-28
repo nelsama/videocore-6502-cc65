@@ -33,6 +33,13 @@ Esta demo está montada a propósito para que `vc_solid_hit()` **se pueda probar
 El HUD distingue qué se golpeó (`PLATAFORMA`, `PISO`, `OTRO` o `BOX`), porque el
 flag del hardware por sí solo no lo dice.
 
+> **El bloque y el rombo se mueven solo por la mitad superior** (`y = 16..144`).
+> Parece un rebote "en horizontal" a la altura de la plataforma y es deliberado:
+> así su `COLL_POINT` no puede caer nunca en la fila 20 (sólida) y el flag sigue
+> siendo fiable. Para movimiento por toda la pantalla habría que quitar
+> `VC_ATTR_SOLID` de la fila 20, y entonces la demo dejaría de probar la colisión
+> del hardware contra la plataforma.
+
 > **Al probarlo en el emulador**, `/state.txt` publica el scroll, cuál usa la
 > colisión y la celda que consulta cada sprite (`celda_colision()`). Si quitas el
 > `RASTER_LINE1 = 0xFF` y vuelves a poner una banda inferior fija, verás el

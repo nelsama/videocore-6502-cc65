@@ -154,7 +154,16 @@ static const uint8_t box_p1[4][8] = {
 #define COLL_APARCADO  VC_COLL_POINT(0, 0)
 
 /* Techo de movimiento para los objetos que no deben colisionar: se quedan por
- * encima de la plataforma (y=160), con margen. */
+ * encima de la plataforma (y=160), con margen.
+ *
+ * CONSECUENCIA VISIBLE Y ACEPTADA: el bloque y el rombo solo recorren la mitad
+ * superior de la pantalla (y = 16..144), asi que parecen rebotar "en
+ * horizontal" a la altura de la plataforma. Es deliberado: es el precio de que
+ * su COLL_POINT nunca caiga en la fila 20 y el flag siga siendo fiable.
+ *
+ * Alternativa si algun dia se quiere movimiento completo: quitar VC_ATTR_SOLID
+ * de la fila 20 y validar la plataforma solo por software. Se descarto porque
+ * entonces la demo dejaria de probar vc_solid_hit() contra la plataforma. */
 #define Y_APARCADO_MAX   144
 
 /* Indices de PATRON de sprite (0-63).
