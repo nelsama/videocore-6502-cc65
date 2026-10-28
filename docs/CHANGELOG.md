@@ -225,6 +225,27 @@ Anotado para valorar más adelante. **Nada de esto está en la API actual.**
 - **Tamaños arbitrarios N×M.** Generalizar la composición (32×16, 24×8, …) sobre
   una rejilla de celdas de 8×8, con una única función que reciba filas y columnas.
 
+- **Dividir `gfx.c` para enlazar solo lo usado.** `gfx.c` es **un único objeto**
+  de 1006 B, así que usar una sola de sus funciones arrastra *todas* al binario.
+  Partirlo en varios `.o` (sprites, texto, cajas, paletas) permitiría al linker
+  descartar lo no usado.
+
+  Medido con el mapa del linker (demo):
+
+  | Módulo | Código |
+  |---|---|
+  | `video.o` (asm) | 1050 B |
+  | `gfx.c` | 1006 B |
+  | `collide.o` (asm) | 170 B |
+  | **Total** | **2226 B (2,17 KB)** |
+
+  Más 38 B de Zero Page. Un programa mínimo que use la biblioteca pesa **2632 B**
+  en total (con `startup.s` y el runtime de cc65). El `vc.lib` en disco (25 KB) no
+  es representativo: incluye las tablas de símbolos.
+
+  Ahorro estimado: unos **400-600 B** en juegos que no usen texto o no usen las
+  cajas AABB.
+
 ## [Inicial]
 
 ### Corregido

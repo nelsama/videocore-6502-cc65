@@ -695,17 +695,25 @@ escribiendo el sprite en vez del dato) están documentadas en
 
 ### Coste de tamaño
 
-| Módulo | Código |
-|--------|--------|
-| `video.o` | ~1.0 KB (núcleo asm) |
-| `collide.o` | ~170 B (colisiones AABB asm) |
-| `gfx.o` | ~930 B (alto nivel C) |
-| **Total biblioteca** | **~2.1 KB** de código |
-| Binario de un ejemplo | ~3.8–5.7 KB (con startup + main + runtime) |
+| Módulo | Código | Zero Page |
+|--------|--------|-----------|
+| `video.o` | 1050 B (núcleo asm: VRAM, sprites, paletas, scroll) | 20 B |
+| `gfx.o` | 1006 B (alto nivel C) | — |
+| `collide.o` | 170 B (colisiones AABB asm) | 18 B |
+| **Total biblioteca** | **2226 B (~2.17 KB)** | **38 B** |
+
+Binarios de ejemplo: **2632 B** uno mínimo, ~3.9–5.9 KB los de `examples/` (con
+`startup.s`, `main` y el runtime de cc65).
 
 De la biblioteca se **enlaza solo lo que uses** (es un `.lib`; el linker descarta lo
-no referenciado). El archivo `vc.lib` en disco es mayor (~25 KB) porque incluye
-símbolos de depuración, que no van al binario final.
+no referenciado). El archivo `vc.lib` en disco es mayor (~25 KB) porque incluye la
+tabla de símbolos, que no va al binario final.
+
+> ⚠️ **El descarte es por módulo `.o`, no por función.** `gfx.c` es un único objeto,
+> así que usar **una** de sus funciones (p. ej. `vc_put_str_pal`) arrastra las 1006 B
+> completas. `video.o` y `collide.o` también entran enteros. Si el espacio llega a
+> apretar, dividir `gfx.c` en varios `.o` (sprites, texto, cajas, paletas) permitiría
+> descartar lo no usado; está anotado en el [`CHANGELOG`](CHANGELOG.md).
 
 ---
 
