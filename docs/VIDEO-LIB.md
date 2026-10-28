@@ -368,8 +368,36 @@ Puntos de colisión: `VC_COLL_TOPLEFT`, `VC_COLL_CENTER`, `VC_COLL_FEET`,
 > Historia del fallo y su corrección en
 > [`BUG-solid-hit-ignora-scroll.md`](BUG-solid-hit-ignora-scroll.md).
 
-> La coordenada X es de **9 bits (0-511)**. `vc_sprite_move()` calcula el bit 8
-> automáticamente a partir de la X de 16 bits.
+> ⚠️ **La X de un sprite se reparte en DOS campos del OAM.** Ocupa **9 bits
+> (0-511)** porque la pantalla mide 320 px:
+>
+> | Parte | Dónde | Rango |
+> |---|---|---|
+> | Bits 7:0 | `X` (`+0`) | 0-255 |
+> | Bit 8 | `FLAGS` (`+3`), **bit 2** (`VC_SPR_XBIT8`) | 0 o 1 |
+>
+> La Y **no** se parte: es un byte completo (0-255), de sobra para 240 px.
+>
+> En la API es **una sola coordenada** (`uint16_t`) y la librería la gestiona sola:
+> `vc_sprite_move()` y `vc_sprite16_set()` calculan el bit 8 y lo llevan al
+> `FLAGS` (esta última también cuando el cuadrante derecho de un 16×16 cruza de
+> 255 a 256).
+>
+> **`vc_oam_put(spr, VC_OAM_X, v)` escribe SOLO 8 bits.** Si mueves a mano y
+> cruzas 255→256, la X vuelve a 0 y el sprite salta a la mitad izquierda. Hay que
+> escribir también el `FLAGS`. Usa `vc_sprite_move()` salvo que tengas un motivo
+> para no hacerlo:
+>
+> ```c
+> /* MAL: al pasar de x=255 a x=256, el sprite reaparece en x=0 */
+> vc_oam_put(spr, VC_OAM_X, (uint8_t)x);
+>
+> /* BIEN: una sola llamada, gestiona el bit 8 */
+> vc_sprite_move(spr, x, y, VC_SPPAL_2);
+> ```
+>
+> `vc_sprite_set()` **no** calcula el bit 8 (`x_lo` es de 8 bits): si el sprite
+> empieza en `x >= 256`, ponlo tú en `flags` con `VC_SPR_XBIT8`.
 
 > `vc_load_spr_pattern(patron, ...)` maneja automáticamente la **dirección alta**
 > (`dir_alta`, bits 2:0 de `$D801`) al escribir el patrón: `patron*8+fila` puede

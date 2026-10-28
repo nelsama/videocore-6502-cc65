@@ -698,7 +698,7 @@ vc_clear_oam();                    vc_clear_bg_patterns();  vc_clear_spr_pattern
 /* Sprites */
 vc_sprite_set(slot,&s);  vc_sprite_move(slot,x,y,flags);
 vc_sprite_disable(slot); vc_sprite16_set(first,x,y,tile0,flags);
-vc_oam_put(slot, field, data);
+vc_oam_put(slot, field, data);   /* OJO: X solo 8 bits, ver abajo */
 
 /* Colisión */
 vc_solid_hit();
@@ -717,6 +717,18 @@ vc_put_char(col,row,c);  vc_put_str(col,row,s);  vc_put_str_pal(col,row,s,pal);
 /* Sin scroll: */
 vc_set_scroll_x(0);  vc_set_scroll_y(0);   /* y no llames a vc_set_raster */
 ```
+
+> ⚠️ **La X de un sprite son 9 bits y `vc_oam_put` solo escribe 8.** El bit 8 vive
+> en el `FLAGS` (bit 2, `VC_SPR_XBIT8`). Si mueves a mano cruzando 255→256, el
+> sprite **salta a la mitad izquierda**:
+>
+> ```c
+> vc_oam_put(slot, VC_OAM_X, (uint8_t)x);   /* MAL: en x=256 reaparece en x=0 */
+> vc_sprite_move(slot, x, y, flags);        /* BIEN: gestiona el bit 8       */
+> ```
+>
+> Usa **`vc_sprite_move()`** para mover. `vc_oam_put` reservalo para `TILE`,
+> `COLL` y los demás campos de 8 bits.
 
 **Constantes útiles**
 
