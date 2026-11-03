@@ -198,13 +198,20 @@ void     vc_set_bgcolor(uint16_t rgb444);
 
 /* ===========================================================================
  * 6. ATRIBUTO DEL FONDO (bytes de $D801 área ATTR)
+ * ===========================================================================
+ * El RTL solo lee TRES bits de este byte:
+ *   bits 1:0 = paleta (0-3, cuatro paletas)
+ *   bit  4   = SOLIDO
+ * Los bits 2, 3, 5, 6 y 7 llegan a la BSRAM y se DESCARTAN al leer.
+ *
+ * Por eso abajo solo existe VC_ATTR_SOLID: los flips y la prioridad del FONDO
+ * no estan implementados en el hardware (manual del core, §2.2 y 03-FORMATOS).
+ * Si necesitas voltear o dar prioridad, hazlo con SPRITES (sus flags SI
+ * funcionan) o con patrones de tile distintos.
  * =========================================================================== */
 
-#define VC_ATTR_PRIO          0x80  /* sprite/tile detrás del fondo           */
-#define VC_ATTR_FLIP_Y        0x40
-#define VC_ATTR_FLIP_X        0x20
 #define VC_ATTR_SOLID         0x10  /* celda sólida (colisión)                */
-/* bits 3:0 = paleta */
+/* bits 1:0 = paleta (0-3). El resto de bits se ignoran en el hardware. */
 
 /* ===========================================================================
  * 7. FLAGS DE SPRITE (campo +3 del OAM)

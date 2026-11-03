@@ -14,8 +14,22 @@ solo el registro de cambios.
 > (hardware de referencia `6502_board_v3`, con **setup de VRAM por hardware**). Ver
 > [`07-MANUAL-PROGRAMACION.md`](07-MANUAL-PROGRAMACION.md). Al recompilar el core,
 > revisa esa versión antes de dar por buena esta de la librería.
+>
+> Última revisión frente al core: commits `b545716`, `109fc5f`, `ac34350`,
+> `0633341`, `bd5e160`, `57774ed`. Sin cambios que rompan la API.
 
 ### Corregido
+
+- **La librería exponía `VC_ATTR_PRIO`, `VC_ATTR_FLIP_X` y `VC_ATTR_FLIP_Y`, que no
+  hacen nada.** El RTL del core solo lee **tres bits** del byte de atributo: paleta
+  en 1:0 y `SOLIDO` en el bit 4. Los bits 5 (FLIP_X), 6 (FLIP_Y) y 7 (PRIO) llegan a
+  la BSRAM y **se descartan**. Se han eliminado de `video.h` y de la documentación
+  (no los usaba ningún ejemplo). Para voltear o dar prioridad hay que usar **sprites**
+  o patrones de tile distintos. Detectado al revisar el core `b545716`.
+
+- **Los patrones de sprite ya no arrancan con arte de demo.** El manual decía que
+  0-2 traían formas de demo y había que sobrescribirlos; el core actual los inicializa
+  **a cero**. Corregido en `VIDEO-LIB.md` y en la guía.
 
 - **`vc_sprite_disable()` no ponía `X = 0`.** Solo escribía `Y = 248` y `COLL = 0`, así
   que el punto de colisión se quedaba en la **columna donde murió el sprite** (y con

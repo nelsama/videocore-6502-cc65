@@ -57,11 +57,11 @@ gestiona por ti (`vc_*`); solo necesitas conocerlas para **calcular presupuestos
 | **OAM** | 160 B (32 sprites) | X / Y / TILE / FLAGS / COLL de cada sprite | `vc_sprite_set` |
 | **Patrones de sprite** | 64 patrones | los dibujos de los sprites (8×8, 2bpp) | `vc_load_spr_pattern` |
 
-> ⚠️ **Los patrones de sprite 0-2 no arrancan vacíos.** Al encender, el core graba
-> en ellos tres formas de demo (cara, rombo, X); tras un setup de VRAM quedan a
-> cero. **No están reservados: los 64 patrones (0-63) son utilizables.** Solo hay
-> que **sobrescribir 0-2** con tu arte (igual que cualquier otro patrón) en vez de
-> asumir que están vacíos. Lo mismo pasa con los **tiles de fondo 0-7**.
+> **Los patrones de sprite arrancan vacíos en las versiones actuales del core.**
+> La secuencia de inicialización ya no graba formas de demo (se retiraron por
+> consumir recursos sin aportar nada), así que **los 64 patrones (0-63) arrancan a
+> cero** y son utilizables directamente. Si trabajas con un bitstream antiguo,
+> 0-2 podrían traer arte de demo: escríbelos igualmente y no tendrás el problema.
 
 > **Banco de patrones vs OAM:** el **banco de patrones** son los *dibujos*
 disponibles; la **OAM** (32 sprites) son los sprites *colocados* en pantalla. Cada
@@ -402,9 +402,9 @@ Puntos de colisión: `VC_COLL_TOPLEFT`, `VC_COLL_CENTER`, `VC_COLL_FEET`,
 > `vc_load_spr_pattern(patron, ...)` maneja automáticamente la **dirección alta**
 > (`dir_alta`, bits 2:0 de `$D801`) al escribir el patrón: `patron*8+fila` puede
 > llegar a 511 y la función reparte la dirección entre `$D800` y `$D801` por ti.
-> Puedes escribir **cualquier patrón 0..63**. Ojo: **0-2 no arrancan vacíos** (el
-> core graba ahí formas de demo al encender), así que si los usas, **sobrescríbelos**
-> con tu arte como cualquier otro. El setup de VRAM los deja a cero.
+> Puedes escribir **cualquier patrón 0..63**. Los 64 arrancan vacíos en las
+> versiones actuales del core (ya no hay arte de demo). Escribe siempre tus
+> patrones al arrancar y no dependas de lo que haya.
 
 > **`VC_SPR_SCALE2X` duplica píxeles, no compone 4 patrones.** Un sprite 8×8 con ese
 > flag ocupa **16×16** en pantalla leyendo **un único patrón** (cada fila y columna
@@ -564,9 +564,14 @@ real que se ve es `paleta[color]`. `VC_COLOR*` es el índice dentro de la paleta
 > a través de él (fondo o `BG_COLOR`). La fuente estándar **solo** usa el color 3;
 > para más colores de texto habría que cambiar las paletas del hardware.
 >
-> Para control total por celda (paleta + flags, p. ej. `VC_ATTR_PRIO`), usa
-> `vc_set_cell_attr(col,row,paleta,flags)` tras escribir el carácter con
-> `vc_put_char`.
+> Para cambiar la paleta de una celda, usa `vc_set_cell_attr(col,row,paleta,flags)`
+> tras escribir el carácter con `vc_put_char`.
+>
+> ⚠️ **El atributo del fondo solo usa `VC_ATTR_SOLID` y la paleta (0-3).** Los
+> flips y la prioridad **no están implementados en el hardware**: los bits 2, 3, 5,
+> 6 y 7 del atributo se descartan al leer (manual del core §2.2). Para voltear o
+> dar prioridad, usa **sprites** (sus flags sí funcionan) o patrones de tile
+> distintos.
 
 > ⚠️ **Filas seguras:** usa las filas **1..28**. La fila 0 se ve desplazada por el
 > pipeline y la **fila 29 puede recortarse** por overscan del monitor. Ver la
@@ -777,7 +782,7 @@ VC_SETUP_BUSY (0x01)
 VC_SPR_FLIP_Y  VC_SPR_FLIP_X  VC_SPR_PRIO  VC_SPR_SCALE2X  VC_SPR_XBIT8
 
 /* Flags de atributo de celda (VC_ATTR_*) */
-VC_ATTR_PRIO  VC_ATTR_FLIP_Y  VC_ATTR_FLIP_X  VC_ATTR_SOLID
+VC_ATTR_SOLID            /* el resto de bits NO existe: ver nota del atributo */
 
 /* Puntos de colisión */
 VC_COLL_CENTER  VC_COLL_FEET  VC_COLL_HEAD  VC_COLL_LEFT  VC_COLL_RIGHT
