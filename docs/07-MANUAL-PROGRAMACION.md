@@ -153,7 +153,7 @@ bits del `$D801`. Cada una tiene su propio espacio de direcciones (empieza en 0)
 | Área | `$D801` (bits 7:5 / bit3) | Tamaño | Unidad | Dirección | Uso |
 |------|---------------------------|--------|--------|-----------|-----|
 | **Tilemap** | `$00` | 2048 | bytes | `fila*64 + col` | índice de patrón por celda (mundo 64×32) |
-| **Atributos** | `$40` | 2048 | bytes | `fila*64 + col` | paleta/flips/PRIO/SÓLIDO por celda |
+| **Atributos** | `$40` | 2048 | bytes | `fila*64 + col` | paleta (bits 1:0) y SÓLIDO (bit 4); flips/PRIO **no implementados** |
 | **Patrones de fondo** | `$80`/`$A0` (plano 0/1) | 2048 | **palabras** | `tile*8 + fila` | 256 patrones de 8×8, 2bpp |
 | **OAM** | `$C0` (bit3=0) | 160 | bytes | `sprite*5 + campo` | 32 sprites × 5 campos |
 | **Patrones de sprite** | `$C8`/`$E8` (plano 0/1) | 512 | **palabras** | `patron*8 + fila` | 64 patrones de 8×8, 2bpp (§6.0) |
@@ -531,19 +531,13 @@ Los sprites usan un **banco aparte** del de fondo. Su tamaño y direccionamiento
 > ⚠️ **Rango del campo `TILE` del OAM:** el byte `TILE` (+2) es de **6 bits (0..63)**
 > y el banco tiene **64 patrones**. Usa **TILE = 0..63** para seleccionar el patrón.
 
-> ⚠️ **Los patrones 0-2 no arrancan vacíos.** Al encender, la secuencia de
-> inicialización graba en los patrones 0, 1 y 2 tres formas de demo (cara, rombo,
-> X). Si pides un setup por `$D816`, esas mismas posiciones quedan **a cero**.
->
-> **No es una restricción: los 64 patrones son utilizables.** La única condición es
-> **no asumir que 0-2 están vacíos**: si quieres usarlos, escríbelos con tu arte
-> igual que cualquier otro (ver abajo). Un juego que carga todos sus patrones al
-> arrancar puede usar el rango completo **0..63** sin problemas.
+> ✅ **Los patrones 0-2 arrancan vacíos** en las versiones actuales: la secuencia de
+> inicialización ya no graba arte de demo (se eliminó por consumir recursos sin
+> aportar nada). **Los 64 patrones son utilizables** y arrancan a cero.
 
 | Patrones | Al arrancar | ¿Utilizable? |
 |---|---|---|
-| **0-2** | Formas de demo (cara, rombo, X); ceros tras `$D816` | ✅ Sí, sobrescribiéndolos |
-| **3-63** | Ceros | ✅ Sí |
+| **0-63** | Ceros | ✅ Sí, escribiéndolos |
 
 **Sobrescribir los patrones 0-2** (mismo mecanismo que cualquier patrón de sprite;
 dirección `patron*8 + fila`, `$D801` = `$C8` plano 0 / `$E8` plano 1; ver §2.2 y
@@ -1490,7 +1484,7 @@ wait_setup:
 | Coordenada X | **9 bits (0-511)** | bit 8 en FLAGS(2) → cubre toda la pantalla |
 | Coordenada Y | 8 bits (0-255) | pantalla 240 → sobra |
 | Sprites por línea | **8 (máximo del chip)** | Más → `OVERFLOW` y se pierde alguno. **8 es un límite duro de este bitstream** (ver nota abajo) |
-| Sprites (patrones) | **64** (0..63) | 8×8, 2bpp; el campo TILE es de 6 bits (§6.0). **Todos utilizables** (0-2 arrancan con arte de demo: sobrescribirlos) |
+| Sprites (patrones) | **64** (0..63) | 8×8, 2bpp; el campo TILE es de 6 bits (§6.0). **Todos utilizables**, arrancan a cero |
 | Patrones de fondo | 256 | comparte rango con la fuente (`$20`-`$7F`) |
 | Paletas de fondo / sprite | 4 / 4 | cada una de 4 colores; **escribibles** por el CPU (§4.4) |
 | Colores en pantalla | hasta 32 | 16 de fondo (4 paletas × 4) + 16 de sprite |
@@ -1513,7 +1507,7 @@ wait_setup:
 > UART) o migrar el line buffer a BSRAM (que también está al 100%).
 
 > **Sobre los patrones de sprite 0-2:** el arranque del core los **inicializa**
-> con tres formas de demo (cara, rombo, X); tras un setup `$D816` quedan **a cero**.
+> con los patrones de sprite arrancando a cero.
 > No están reservados: **los 64 patrones (0-63) son utilizables**. Solo hay que
 > **sobrescribir 0-2** con el propio arte si se quieren usar, en vez de asumir que
 > arrancan vacíos. Las escrituras se ignoran mientras `init_done='0'`, así que hay
