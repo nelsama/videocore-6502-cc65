@@ -94,6 +94,7 @@ para memoria, y **registros directos** para scroll/status/bandas.
 | `$D815` | `PAL_HI` | W | Color de paleta, bits 11:8 → **escribe la entrada y auto-incrementa `PAL_PTR`** |
 | `$D816` | `SETUP` | W | **Dispara el setup de hardware** (limpiar VRAM + re-expandir fuente). Ver §11.3 |
 | `$D817` | `SETUP_ST` | R | Estado del setup: bit0 = BUSY, bit4 = VIDEO_READY. Ver §11.3 |
+| `$D818` | `FONT_COLOR` | W | **Color del trazo de la fuente** (0-3). Ver §4.5 |
 
 ### 2.2 Encoding de `$D801` (área + dirección alta)
 
@@ -388,6 +389,93 @@ parpadeos, paletas por nivel, etc.
 > ⚠️ **Escribe la paleta en VBLANK** si cambias muchos colores: aunque el motor aplica
 > el color al vuelo, hacerlo a mitad de frame puede mostrar una franja con el color
 > viejo y otra con el nuevo.
+
+#### ⚠️ Qué afecta reescribir una entrada de paleta
+
+Una entrada de paleta **no pertenece a una sola cosa**: es el color que usan **todas
+las celdas y sprites** que la referencien. Al cambiar una entrada cambia todo lo que
+caiga sobre ella, de golpe y sin aviso.
+
+**Paleta de FONDO** (entradas 0-15 = `paleta*4 + color`):
+
+| Entrada | La usan |
+|---|---|
+| color 0 (0, 4, 8, 12) | **nada**: el color 0 del fondo es siempre transparente; escribir ahí no tiene efecto visible |
+| color 1, 2, 3 | **tiles gráficos** del juego (muros, fruta, suelo…) **y** el **texto**, si su celda usa esa paleta |
+
+- El **texto** usa siempre una sola entrada: la que diga `$D818` (3 por defecto).
+  Con `$D818 = 3`, el color del texto de cada celda es la entrada `paleta*4 + 3`.
+- Los **tiles gráficos** pueden usar cualquiera de los 4 colores de su paleta, según
+  sus dos planos de bits.
+
+**Paleta de SPRITE** (entradas 16-31):
+
+| Entrada | La usan |
+|---|---|
+| color 0 (16, 20, 24, 28) | **nada**: el color 0 del sprite es transparente |
+| color 1, 2, 3 | **solo los sprites**, cada uno con la paleta de su byte FLAGS |
+
+**Ejemplo de efecto colateral:** si tu juego dibuja un muro con "paleta 1, color 1"
+(entrada 5 = `$A62` marrón) y cambias la entrada 5 a verde para tener texto verde,
+**el muro también se vuelve verde**.
+
+**Cómo evitar sorpresas:**
+
+1. Reserva **una paleta entera para el texto** y no la uses para gráficos. Con 4
+   paletas de fondo, dedica por ejemplo la 2 al texto y las 0, 1 y 3 a gráficos.
+2. Cambia la paleta **al cargar la pantalla**, no a mitad de partida.
+3. Si cambias una entrada que usan gráficos, **redibuja** o acepta el cambio de color.
+
+> ⚠️ **`BG_COLOR` es la entrada 15** (paleta 3, color 3). Si cambias esa entrada
+> cambia **el fondo de toda la pantalla** (el margen y las zonas transparentes), no
+> solo el texto que use "paleta 3, color 3".
+
+### 4.5 Color del texto (`$D818`)
+
+La fuente se expande a los patrones con **una sola entrada de paleta** para todo el
+trazo. `FONT_COLOR` elige cuál:
+
+| Dir | Nombre | R/W | Función |
+|-----|--------|-----|---------|
+| `$D818` | `FONT_COLOR` | W | Entrada de paleta del trazo: **0-3** (bits 1:0) |
+
+| Valor | Trazo |
+|-------|-------|
+| 0 | color 0 → **transparente** (el texto no se ve) |
+| 1 | color 1 de la paleta de la celda |
+| 2 | color 2 de la paleta de la celda |
+| **3** | color 3 de la paleta de la celda (**valor al arrancar**) |
+
+- **Es global**: un valor para **toda** la fuente a la vez.
+- **No repinta solo.** Escribir `$D818` no cambia nada en pantalla: los patrones ya
+  están en la BSRAM. Hay que **re-expandir la fuente** con `SETUP` (`$D816`).
+- ⚠️ **`SETUP` limpia el tilemap**: hay que redibujar la pantalla después.
+
+**Ejemplo: texto en el color 2**
+
+```asm
+    LDA #2   : STA $D818      ; color de trazo = 2
+    LDA #0   : STA $D816      ; SETUP: re-expande la fuente (limpia la VRAM)
+wait:
+    LDA $D817
+    AND #$10                  ; VIDEO_READY
+    BEQ wait
+    ; ...redibujar el tilemap...
+```
+
+**Colores de texto por celda, sin `$D818`.** Como cada celda elige su propia
+**paleta** (bits 1:0 del atributo), con `FONT_COLOR = 3` ya tienes 4 colores de
+texto simultáneos, uno por paleta:
+
+| Paleta de la celda | Color de texto (entrada 3 por defecto) |
+|---|---|
+| 0 | blanco `FFF` |
+| 1 | blanco `FFF` |
+| 2 | verde `0F0` |
+| 3 | azul `48C` (**igual que `BG_COLOR`**) |
+
+Combinando ambos: **paleta por celda** (inmediato) + **color de trazo global**
+(cambia con SETUP). Ver `src/asm/demo_fontcolor.asm`.
 
 ---
 
@@ -1276,6 +1364,7 @@ reusando la misma máquina de inicialización que corre al arrancar. Es útil pa
 |-----|--------|-----|---------|
 | `$D816` | `SETUP` | W | Escribir **cualquier valor** dispara el setup |
 | `$D817` | `SETUP_ST` | R | bit0 = `BUSY`, bit4 = `VIDEO_READY` |
+| `$D818` | `FONT_COLOR` | W | Color del trazo de la fuente (0-3). Ver §4.5 |
 
 **Qué hace el setup (todo en hardware, ~120-275 µs):**
 1. Limpia el **tilemap** completo (2048 celdas → tile 0).
