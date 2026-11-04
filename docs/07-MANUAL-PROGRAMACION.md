@@ -619,13 +619,19 @@ Los sprites usan un **banco aparte** del de fondo. Su tamaño y direccionamiento
 > ⚠️ **Rango del campo `TILE` del OAM:** el byte `TILE` (+2) es de **6 bits (0..63)**
 > y el banco tiene **64 patrones**. Usa **TILE = 0..63** para seleccionar el patrón.
 
-> ✅ **Los patrones 0-2 arrancan vacíos** en las versiones actuales: la secuencia de
-> inicialización ya no graba arte de demo (se eliminó por consumir recursos sin
-> aportar nada). **Los 64 patrones son utilizables** y arrancan a cero.
+> ⚠️ **Los patrones 0-2 NO arrancan vacíos**: la secuencia de inicialización los
+> **graba con arte de demo** (fase 3, ver §9). Los 64 patrones son utilizables, pero
+> los tres primeros traen dibujos hasta que se sobrescriban.
 
 | Patrones | Al arrancar | ¿Utilizable? |
 |---|---|---|
-| **0-63** | Ceros | ✅ Sí, escribiéndolos |
+| **0** | **cara** (arte de demo) | ✅ Sí, sobrescribiendo |
+| **1** | **rombo** (arte de demo) | ✅ Sí, sobrescribiendo |
+| **2** | **X** (arte de demo) | ✅ Sí, sobrescribiendo |
+| 3-63 | Ceros | ✅ Sí |
+
+Los tres son dibujos multicolor 8×8 que se usan en las demos de sprites. Si tu juego
+usa los patrones 0, 1 o 2, **sobrescríbelos** antes de mostrar sprites.
 
 **Sobrescribir los patrones 0-2** (mismo mecanismo que cualquier patrón de sprite;
 dirección `patron*8 + fila`, `$D801` = `$C8` plano 0 / `$E8` plano 1; ver §2.2 y
@@ -1369,10 +1375,14 @@ reusando la misma máquina de inicialización que corre al arrancar. Es útil pa
 **Qué hace el setup (todo en hardware, ~120-275 µs):**
 1. Limpia el **tilemap** completo (2048 celdas → tile 0).
 2. Limpia los **atributos** (2048 celdas → 0).
-3. Limpia los **patrones de fondo** y de **sprite** escribibles.
+3. Limpia los **patrones de fondo** (tiles 0-7) y de **sprite** (0-2): escribe
+   **ceros**. Aquí se diferencian del arranque, que graba arte de demo (§6.0).
 4. **Re-expande la fuente**: vuelve a copiar los glifos desde la ROM de fuente
    a los patrones `$20-$7F`, así el texto sigue disponible tras limpiar.
 5. **No toca**: RAM, ROM, paletas, scroll, bandas, ni el estado del CPU.
+
+> ⚠️ **Un SETUP borra el arte de los patrones 0-7 de fondo y 0-2 de sprite.** Si tu
+> juego los usa, recárgalos después del setup.
 
 **Mientras el setup corre (`BUSY=1`), las escrituras del CPU a la VRAM/OAM se
 IGNORAN** (no pueden corromperlo). El CPU puede seguir escribiendo scroll y
@@ -1573,7 +1583,7 @@ wait_setup:
 | Coordenada X | **9 bits (0-511)** | bit 8 en FLAGS(2) → cubre toda la pantalla |
 | Coordenada Y | 8 bits (0-255) | pantalla 240 → sobra |
 | Sprites por línea | **8 (máximo del chip)** | Más → `OVERFLOW` y se pierde alguno. **8 es un límite duro de este bitstream** (ver nota abajo) |
-| Sprites (patrones) | **64** (0..63) | 8×8, 2bpp; el campo TILE es de 6 bits (§6.0). **Todos utilizables**, arrancan a cero |
+| Sprites (patrones) | **64** (0..63) | 8×8, 2bpp; el campo TILE es de 6 bits (§6.0). **Todos utilizables**; 0-2 traen arte de demo |
 | Patrones de fondo | 256 | comparte rango con la fuente (`$20`-`$7F`) |
 | Paletas de fondo / sprite | 4 / 4 | cada una de 4 colores; **escribibles** por el CPU (§4.4) |
 | Colores en pantalla | hasta 32 | 16 de fondo (4 paletas × 4) + 16 de sprite |
@@ -1595,12 +1605,11 @@ wait_setup:
 > unPlaced`). Para ampliarlo habría que **liberar CLS** de otro módulo (SD, SID,
 > UART) o migrar el line buffer a BSRAM (que también está al 100%).
 
-> **Sobre los patrones de sprite 0-2:** el arranque del core los **inicializa**
-> con los patrones de sprite arrancando a cero.
-> No están reservados: **los 64 patrones (0-63) son utilizables**. Solo hay que
-> **sobrescribir 0-2** con el propio arte si se quieren usar, en vez de asumir que
-> arrancan vacíos. Las escrituras se ignoran mientras `init_done='0'`, así que hay
-> que esperar `VIDEO_READY` (bit 4 de `$D803`). Lo mismo aplica a los **tiles de
+> **Sobre los patrones de sprite 0-2:** el arranque del core los **graba con arte de
+> demo** (cara, rombo y X), así que **no** están a cero. No están reservados: **los
+> 64 patrones (0-63) son utilizables**; solo hay que **sobrescribir 0-2** con el propio
+> arte si se quieren usar. Las escrituras se ignoran mientras `init_done='0'`, así que
+> hay que esperar `VIDEO_READY` (bit 4 de `$D803`). Lo mismo aplica a los **tiles de
 > fondo 0-7**, que también vienen con texturas de demo.
 > Ver §6.0.
 
