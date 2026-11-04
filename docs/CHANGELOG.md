@@ -15,7 +15,7 @@ solo el registro de cambios.
 > [`07-MANUAL-PROGRAMACION.md`](07-MANUAL-PROGRAMACION.md). Al recompilar el core,
 > revisa esa versión antes de dar por buena esta de la librería.
 >
-> Última revisión frente al core: commits `b2aff50`, `182d505`, `c40db9c`,
+> Última revisión frente al core: commits `f8e2069`, `b2aff50`, `182d505`, `c40db9c`,
 > `9d7b89f`, `cac7049`, `b545716`, `109fc5f`, `ac34350`, `0633341`, `bd5e160`,
 > `57774ed`. Sin cambios que rompan la API.
 
@@ -45,6 +45,11 @@ solo el registro de cambios.
 
 ### Añadido
 
+- **Los patrones de sprite 0-2 y los tiles de fondo 0-7 SÍ traen arte de demo**
+  (core `f8e2069`). La revisión anterior del manual decía lo contrario (que
+  arrancaban a cero) y esta librería lo copió; **estaba mal**. Corregido en
+  `VIDEO-LIB.md` y en la guía. Un setup de VRAM los deja a cero.
+
 - **Documentado el efecto colateral de reescribir una entrada de paleta** (core
   `b2aff50`). Una entrada es **compartida**: cambiarla afecta a los tiles gráficos
   **y** al texto de esa paleta, no solo a uno. Se documenta el reparto fondo
@@ -63,6 +68,10 @@ solo el registro de cambios.
   Soporte añadido: registro `VID_FONT_COLOR`, función, test
   (`tests/fontcolor_test.s`) y documentación. Además `video.h` ahora respeta
   `TEST_HOOKS` redirigiendo los registros a RAM, para poder probarlos en sim65.
+
+  **Verificado en emulador** (tras el commit `f7d993e` del emulador, que implementa
+  `$D818`): con un solo setup y `vc_set_font_color(1)`, cuatro textos con distinta
+  paleta de celda salen en cuatro colores distintos, sin repintar.
 
 - **Test de regresión `tests/disable_test.s`** (añadido al `tests/run.sh`). Comprueba
   qué escribe `vc_sprite_disable()` en el OAM. Enlaza `gfx.c` de verdad, así que si

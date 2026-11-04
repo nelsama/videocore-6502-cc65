@@ -57,11 +57,12 @@ gestiona por ti (`vc_*`); solo necesitas conocerlas para **calcular presupuestos
 | **OAM** | 160 B (32 sprites) | X / Y / TILE / FLAGS / COLL de cada sprite | `vc_sprite_set` |
 | **Patrones de sprite** | 64 patrones | los dibujos de los sprites (8×8, 2bpp) | `vc_load_spr_pattern` |
 
-> **Los patrones de sprite arrancan vacíos en las versiones actuales del core.**
-> La secuencia de inicialización ya no graba formas de demo (se retiraron por
-> consumir recursos sin aportar nada), así que **los 64 patrones (0-63) arrancan a
-> cero** y son utilizables directamente. Si trabajas con un bitstream antiguo,
-> 0-2 podrían traer arte de demo: escríbelos igualmente y no tendrás el problema.
+> ⚠️ **Los patrones de sprite 0-2 NO arrancan vacíos.** Al encender, el core graba
+> en ellos tres formas de demo (**cara, rombo y X**). No están reservados: **los 64
+> patrones (0-63) son utilizables**, pero **sobrescribe 0-2** antes de mostrar
+> sprites. Un setup de VRAM los deja **a cero** (`vc_clear_vram()` te sirve).
+>
+> Lo mismo pasa con los **tiles de fondo 0-7** (traen texturas de demo).
 
 > **Banco de patrones vs OAM:** el **banco de patrones** son los *dibujos*
 disponibles; la **OAM** (32 sprites) son los sprites *colocados* en pantalla. Cada
@@ -436,9 +437,9 @@ Puntos de colisión: `VC_COLL_TOPLEFT`, `VC_COLL_CENTER`, `VC_COLL_FEET`,
 > `vc_load_spr_pattern(patron, ...)` maneja automáticamente la **dirección alta**
 > (`dir_alta`, bits 2:0 de `$D801`) al escribir el patrón: `patron*8+fila` puede
 > llegar a 511 y la función reparte la dirección entre `$D800` y `$D801` por ti.
-> Puedes escribir **cualquier patrón 0..63**. Los 64 arrancan vacíos en las
-> versiones actuales del core (ya no hay arte de demo). Escribe siempre tus
-> patrones al arrancar y no dependas de lo que haya.
+> Puedes escribir **cualquier patrón 0..63**. Ojo: **0-2 no arrancan vacíos** (el
+> core graba ahí arte de demo al encender: cara, rombo y X), así que si los usas,
+> **sobrescríbelos** con tu arte como cualquier otro. El setup de VRAM los deja a cero.
 
 > **`VC_SPR_SCALE2X` duplica píxeles, no compone 4 patrones.** Un sprite 8×8 con ese
 > flag ocupa **16×16** en pantalla leyendo **un único patrón** (cada fila y columna
