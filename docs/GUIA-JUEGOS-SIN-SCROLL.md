@@ -58,7 +58,11 @@ Destilado de cinco juegos reales ya funcionando en este hardware:
 - ⚠️ El auto-incremento del puntero de paleta **satura en 31** (no vuelve a 0);
   recarga el puntero con `vc_pal_ptr()` si quieres empezar de nuevo.
 - Los **colores son independientes del patrón**: el mismo dibujo se ve de distinto
-  color según la paleta. **Aprovéchalo** para no duplicar patrones.
+  color según la paleta. **Aprovechalo** para no duplicar patrones.
+- ⚠️ **Una entrada de paleta es compartida.** Cambiarla afecta a los tiles graficos
+  **y** al texto que use esa entrada, no solo a uno. Si quieres texto de otro color
+  sin tocar los graficos, dedica **una paleta entera al texto** (p. ej. la 2) y no la
+  uses para dibujar.
 
 ## 1.3 Tiles y patrones de fondo
 
@@ -704,7 +708,7 @@ vc_solid_hit();
 vc_box_overlap(&a,&b);   vc_box_contains(&b,px,py);   vc_box_from_sprite(&box,x,y,size);
 
 /* Paletas y color */
-vc_pal_set_bg(pal,idx,rgb);   vc_pal_set_spr(pal,idx,rgb);
+vc_pal_set_bg(pal,idx,rgb);   vc_pal_set_spr(pal,idx,rgb);  /* OJO: compartida */
 vc_pal_load_bg(pal,arr4);     vc_pal_load_spr(pal,arr4);
 vc_set_bgcolor(rgb);
 VC_RGB444(r,g,b);   VC_RGB888(0xRRGGBB);
@@ -712,6 +716,7 @@ VC_RGB444(r,g,b);   VC_RGB888(0xRRGGBB);
 /* Texto */
 vc_text_init();
 vc_put_char(col,row,c);  vc_put_str(col,row,s);  vc_put_str_pal(col,row,s,pal);
+vc_set_font_color(0-3);   /* color GLOBAL del trazo: exige SETUP + redibujar */
 
 /* Sin scroll: */
 vc_set_scroll_x(0);  vc_set_scroll_y(0);   /* y no llames a vc_set_raster */

@@ -49,6 +49,19 @@ void vc_clear_vram(void) {
     vc_clear_oam();     /* deshabilita los 32 sprites */
 }
 
+/* Color del trazo de la fuente ($D818).
+ *
+ * Los patrones de la fuente se expanden UNA vez (en el setup) usando una sola
+ * entrada de paleta para el trazo; este registro elige cuál (0-3). Por eso:
+ *   - 0 deja el texto invisible (el color 0 del fondo es transparente);
+ *   - 3 es el valor de arranque y el que usan los juegos existentes;
+ *   - cambiarlo NO repinta: hace falta el setup, que además limpia el tilemap.
+ *
+ * Aqui solo se escribe el registro; el repintado lo decide quien llama. */
+void vc_set_font_color(uint8_t color) {
+    VID_FONT_COLOR = (uint8_t)(color & 0x03);
+}
+
 /* ===========================================================================
  * ATRIBUTOS DEL FONDO
  * =========================================================================== */

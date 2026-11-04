@@ -15,8 +15,9 @@ solo el registro de cambios.
 > [`07-MANUAL-PROGRAMACION.md`](07-MANUAL-PROGRAMACION.md). Al recompilar el core,
 > revisa esa versión antes de dar por buena esta de la librería.
 >
-> Última revisión frente al core: commits `b545716`, `109fc5f`, `ac34350`,
-> `0633341`, `bd5e160`, `57774ed`. Sin cambios que rompan la API.
+> Última revisión frente al core: commits `b2aff50`, `182d505`, `c40db9c`,
+> `9d7b89f`, `cac7049`, `b545716`, `109fc5f`, `ac34350`, `0633341`, `bd5e160`,
+> `57774ed`. Sin cambios que rompan la API.
 
 ### Corregido
 
@@ -43,6 +44,25 @@ solo el registro de cambios.
   completo de `STATUS`, usa `vc_status()`.
 
 ### Añadido
+
+- **Documentado el efecto colateral de reescribir una entrada de paleta** (core
+  `b2aff50`). Una entrada es **compartida**: cambiarla afecta a los tiles gráficos
+  **y** al texto de esa paleta, no solo a uno. Se documenta el reparto fondo
+  (0-15) / sprite (16-31), que los colores 0 son transparentes y el truco de
+  reservar una paleta entera para el texto. Aviso añadido también en `video.h`
+  sobre `vc_pal_set_bg()`.
+
+- **`vc_set_font_color(0-3)` — color global del trazo de la fuente** (`$D818`, core
+  `cac7049`). La fuente se expande con una sola entrada de paleta para el trazo;
+  hasta ahora estaba fija a 3. El valor 0 la deja **invisible**.
+
+  ⚠️ Es **global** y **no repinta**: hay que re-expandir con el setup (`$D816`), que
+  además **limpia el tilemap**, así que cambiarlo obliga a redibujar la pantalla.
+  Para varios colores a la vez se usa la **paleta de cada celda**.
+
+  Soporte añadido: registro `VID_FONT_COLOR`, función, test
+  (`tests/fontcolor_test.s`) y documentación. Además `video.h` ahora respeta
+  `TEST_HOOKS` redirigiendo los registros a RAM, para poder probarlos en sim65.
 
 - **Test de regresión `tests/disable_test.s`** (añadido al `tests/run.sh`). Comprueba
   qué escribe `vc_sprite_disable()` en el OAM. Enlaza `gfx.c` de verdad, así que si

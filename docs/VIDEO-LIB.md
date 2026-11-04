@@ -319,6 +319,40 @@ vc_set_bgcolor(VC_BG_COLOR_DEFAULT); /* volver al azul cielo por defecto ($48C) 
 > aplica el color al vuelo, y hacerlo a mitad de frame puede mostrar una franja con
 > el color viejo y otra con el nuevo.
 
+#### Qué afecta reescribir una entrada de paleta
+
+Una entrada de paleta **no pertenece a una sola cosa**: es el color que usan **todas
+las celdas y sprites** que la referencien. Cambiarla cambia todo lo que caiga sobre
+ella, de golpe y sin aviso.
+
+**Paleta de FONDO** (entradas 0-15 = `paleta*4 + color`):
+
+| Entrada | La usan |
+|---|---|
+| color 0 (0, 4, 8, 12) | **nada**: el color 0 del fondo es siempre transparente |
+| color 1, 2, 3 | **tiles gráficos** **y** el **texto**, si su celda usa esa paleta |
+
+- El **texto** usa una sola entrada: la que diga `$D818` (3 por defecto). Con
+  `$D818 = 3`, el color del texto de cada celda es la entrada `paleta*4 + 3`.
+- Los **tiles gráficos** usan cualquiera de los 4 colores de su paleta.
+
+**Paleta de SPRITE** (entradas 16-31):
+
+| Entrada | La usan |
+|---|---|
+| color 0 (16, 20, 24, 28) | **nada**: el color 0 del sprite es transparente |
+| color 1, 2, 3 | **solo los sprites** |
+
+**Ejemplo:** si un muro se dibuja con "paleta 1, color 1" (entrada 5) y cambias la
+entrada 5 a verde para tener texto verde, **el muro también se vuelve verde**.
+
+**Cómo evitarlo:**
+
+1. Reserva **una paleta entera para el texto** y no la uses para gráficos (con 4
+   paletas de fondo, dedica la 2 al texto y 0, 1 y 3 a gráficos).
+2. Cambia las paletas **al cargar la pantalla**, no a mitad de partida.
+3. Si tocas una entrada que usan gráficos, **redibuja** o acepta el cambio de color.
+
 ### Sprites (OAM)
 
 ```c
@@ -528,8 +562,35 @@ El modo texto es el motor de tiles con la fuente ASCII cargada: **tile = ASCII**
 | `vc_put_char(col,row,c)` | Escribe un carácter |
 | `vc_put_str(col,row,s)` | Escribe una cadena (termina en `\0`) |
 | `vc_put_str_pal(col,row,s,paleta)` | Igual, fijando la paleta del texto |
+| `vc_set_font_color(0-3)` | Color de trazo **global** de la fuente (ver abajo) |
 
 Rango útil: `$20`-`$7F`.
+
+**Color global del texto (`$D818`, core v2.9+)**
+
+La fuente se expande a los patrones con **una sola entrada de paleta** para todo el
+trazo. `vc_set_font_color()` elige cuál:
+
+| Valor | Trazo |
+|---|---|
+| 0 | color 0 → **invisible** (el 0 del fondo es transparente) |
+| 1 | color 1 de la paleta de la celda |
+| 2 | color 2 |
+| **3** | color 3 (**valor al arrancar**) |
+
+⚠️ **Escribirlo no repinta.** Los patrones ya están expandidos en la BSRAM: hay que
+re-expandir con el setup, y el setup **limpia el tilemap**. Es decir, cambiar el
+color global implica **redibujar la pantalla**.
+
+```c
+vc_set_font_color(2);           /* solo escribe $D818 */
+vc_clear_vram();                /* SETUP: re-expande la fuente + limpia VRAM */
+/* ...volver a dibujar el mapa y los textos... */
+```
+
+Para texto de **varios colores a la vez** no se usa esto: se usa la **paleta de
+cada celda**. Con el trazo en 3 ya hay hasta 4 colores simultáneos (uno por paleta
+de fondo), y cambiarlos no requiere repintar.
 
 **Color del texto:** la fuente pinta el **color 3** de la paleta de la celda, así
 que el color de la tinta lo elige la **paleta** de cada celda, no el tilemap. Usa
@@ -561,8 +622,15 @@ real que se ve es `paleta[color]`. `VC_COLOR*` es el índice dentro de la paleta
 `VC_BGPAL_*` es cuál de las 4 paletas se usa.
 >
 > El color 0 del fondo es **transparente**, así que el "hueco" de las letras se ve
-> a través de él (fondo o `BG_COLOR`). La fuente estándar **solo** usa el color 3;
-> para más colores de texto habría que cambiar las paletas del hardware.
+> a través de él (fondo o `BG_COLOR`). La fuente usa **una sola entrada de paleta**
+> para el trazo; por defecto la **3** (blanco en las paletas 0-1).
+>
+> `vc_set_font_color(0-3)` cambia esa entrada, pero es **global** y **exige
+> repintar**: la fuente ya está expandida en la BSRAM, así que hay que disparar el
+> setup (`$D816`), que además **limpia el tilemap**.
+>
+> Para texto de varios colores **sin repintar**, usa la **paleta de cada celda**:
+> con el trazo en 3 ya tienes hasta 4 colores simultáneos, uno por paleta.
 >
 > Para cambiar la paleta de una celda, usa `vc_set_cell_attr(col,row,paleta,flags)`
 > tras escribir el carácter con `vc_put_char`.
@@ -777,6 +845,9 @@ vc_set_bgcolor(rgb444)          /* color de fondo global (BG_COLOR) */
 /* Setup de VRAM por hardware ($D816/$D817) */
 vc_wait_setup()
 VC_SETUP_BUSY (0x01)
+
+/* Color global del trazo de la fuente ($D818, core v2.9+) */
+vc_set_font_color(0-3)          /* exige setup + redibujar la pantalla */
 
 /* Flags de sprite */
 VC_SPR_FLIP_Y  VC_SPR_FLIP_X  VC_SPR_PRIO  VC_SPR_SCALE2X  VC_SPR_XBIT8

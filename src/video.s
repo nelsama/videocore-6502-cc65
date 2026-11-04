@@ -108,6 +108,7 @@ VID_PAL_LO      = $F014
 VID_PAL_HI      = $F015
 VID_SETUP       = $F016
 VID_SETUP_ST    = $F017
+VID_FONT_COLOR  = $F018
 .else
 VID_ADDR_LO     = $D800
 VID_ADDR_HI     = $D801
@@ -132,6 +133,7 @@ VID_PAL_LO      = $D814
 VID_PAL_HI      = $D815
 VID_SETUP       = $D816
 VID_SETUP_ST    = $D817
+VID_FONT_COLOR  = $D818
 .endif
 
 ; --- Áreas del puerto indirecto ---

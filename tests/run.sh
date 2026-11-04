@@ -56,10 +56,14 @@ run "carga de patron de sprite" build/test_sprload.prg
 run "paletas programables" build/test_pal.prg
 
 # --- gfx.c (necesita video.s con TEST_HOOKS y collide.s) ---
-"$CL65" -t sim6502 -O -I src -c -o build/gfx_sim.o src/gfx.c
+"$CL65" -t sim6502 -O -I src -D TEST_HOOKS -c -o build/gfx_sim.o src/gfx.c
 "$CL65" -t sim6502 -o build/test_disable.prg tests/disable_test.s \
     build/video_sim.o build/gfx_sim.o build/collide_sim.o
 run "sprite_disable apaga todo" build/test_disable.prg
+
+"$CL65" -t sim6502 -o build/test_fontcolor.prg tests/fontcolor_test.s \
+    build/video_sim.o build/gfx_sim.o build/collide_sim.o
+run "color de la fuente" build/test_fontcolor.prg
 
 echo "======================================="
 if [ "$fail" = "0" ]; then
