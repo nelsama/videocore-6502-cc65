@@ -66,6 +66,56 @@ Tres capas, de atrás a delante:
 Todo se controla por **un puerto indirecto de 3 registros** (`$D800/$D801/$D802`)
 para memoria, y **registros directos** para scroll/status/bandas.
 
+### 1.1 Escribir en VRAM mientras se barre: qué pasa y qué NO
+
+Es la duda más habitual, así que conviene ser exacto.
+
+**La VRAM NO se corrompe.** Las escrituras del CPU y las lecturas del barrido van por
+puertos distintos de la misma BSRAM (doble puerto). Escribir la celda 500 mientras el
+barrido lee la celda 120 no afecta a ninguna de las dos: son operaciones
+independientes. Un valor escrito **nunca** se mezcla con otro ni queda a medias.
+
+| Afirmación | ¿Cierta? |
+|---|---|
+| "Escribir mientras se barre corrompe la VRAM" | ❌ **falso** |
+| "Las escrituras pueden perderse o mezclarse" | ❌ falso (salvo durante init/SETUP, ver abajo) |
+| "Se puede ver el cambio a mitad de frame" | ✅ **cierto** → *tearing* |
+
+**Lo que sí ocurre es tearing (desgarro):** si cambias una celda a mitad de frame, la
+parte de la pantalla que el barrido **ya dibujó** muestra el valor viejo y la que
+**aún no** ha dibujado muestra el nuevo. En una misma imagen ves las dos versiones,
+con un corte horizontal.
+
+```
+   ┌──────────────────────┐
+   │  valor NUEVO         │  ← escrito antes de que el barrido pase
+   ├──────────────────────┤  ← corte visible (tearing)
+   │  valor VIEJO         │  ← ya dibujado
+   └──────────────────────┘
+```
+
+**La única excepción real:** mientras `init_done='0'` (arranque y durante un `SETUP`
+`$D816`), el hardware **ignora** las escrituras del CPU para no corromper la
+secuencia de inicialización. Hay que esperar `VIDEO_READY` (bit 4 de `$D803`).
+
+**Recomendación:** escribe en **VBLANK** (bit 7 de `$D803`) no porque el hardware se
+rompa, sino para que el frame se dibuje **entero con el mismo estado**. En la
+práctica:
+
+| Qué escribes | ¿Hace falta VBLANK? |
+|---|---|
+| Tilemap / patrones que cambian de golpe (cambio de pantalla) | ✅ sí, o se ve el corte |
+| Scroll, paletas, bandas (registros que se leen al inicio de frame) | ✅ sí |
+| OAM (posición de sprites) | ✅ sí, por el mismo motivo |
+| Rellenar la pantalla **antes** de mostrarla | ❌ da igual, nadie la ve aún |
+
+> **El OAM no es "más seguro" que el tilemap.** También se lee al vuelo: las entradas
+> se evalúan línea a línea mientras se llena el line buffer (fase 1 de cada línea de
+> barrido). Escribir un sprite a mitad de frame desplaza el sprite en las líneas que
+> faltan por dibujar y lo deja quieto en las ya dibujadas → el sprite sale **partido**.
+> El motivo para escribir en VBLANK es el mismo en ambos casos: **coherencia visual**,
+> no integridad de memoria.
+
 ---
 
 ## 2. Mapa de memoria
@@ -753,6 +803,50 @@ cada columna se repiten dos veces.
 **Coste:** el `SCALE2X` se resuelve **dentro del line buffer**, sin sprites ni
 patrones extra. Pero el sprite 2× sigue ocupando **1 de los 8 huecos por
 línea** (§13), no 4.
+
+### 6.2c Prioridad, transparencia y solapes entre sprites
+
+Tres reglas que conviene tener claras antes de diseñar los gráficos:
+
+**1. Cada sprite es transparente contra su propio patrón.** Donde sus dos planos
+valen 0 (`pixcode 00`), ese píxel **no existe**: se ve lo que haya detrás (fondo o
+`BG_COLOR`). No depende del fondo ni de otros sprites.
+
+**2. Solo se dibuja UN sprite por píxel: el de menor índice.** Cuando varios sprites
+cubren la misma X en la misma línea, el line buffer guarda los primeros `N` (hasta 8)
+en orden de índice, y el píxel lo gana **el de índice más bajo**.
+
+| Píxel del sprite de índice bajo | Píxel del de índice alto | Se ve |
+|---|---|---|
+| opaco | opaco | **el de índice bajo** |
+| opaco | transparente | **el de índice bajo** |
+| transparente | opaco | **el de índice alto** |
+| transparente | transparente | **fondo / `BG_COLOR`** |
+
+**3. NO hay transparencia entre sprites.** Donde el sprite de delante es transparente,
+se ve el **fondo**, nunca el sprite de detrás. El hardware no compone dos capas de
+sprite: es fiel a la NES.
+
+```
+   Sprite A (delante, índice 0)      Sprite B (detrás, índice 5)
+   ┌───┬───┐                          ┌───┬───┐
+   │ █ │   │   el hueco de A         │ █ │ █ │   B tiene píxel aquí
+   ├───┼───┤   muestra el FONDO,     ├───┼───┤
+   │ █ │ █ │   no el sprite B  ⚠️     │ █ │ █ │
+   └───┴───┘                          └───┴───┘
+```
+
+**Cómo se resuelve en la práctica (técnica de la NES):**
+
+- Diseña los personajes como **rejillas de sprites 8×8 que no se pisen**. Donde un
+  personaje "invade" al otro (un puño, un arma), ese trozo es **una celda propia**.
+- Usa **contornos con esquinas transparentes** para que el solape se lea bien.
+- El orden visual se controla con el **índice del sprite** (menor = delante) y con
+  **`PRIO`** (bit 5 de FLAGS) frente al fondo.
+
+> **Presupuesto:** máximo **8 sprites por línea**. Si se superan, se pierden y se
+> activa `OVERFLOW` (bit 6 de `$D803`). Dos personajes de 16×16 (2×2 sprites) ocupan
+> **2 sprites por línea cada uno**: sobran 4 para proyectiles y efectos.
 
 ### 6.3 Escribir un campo del OAM
 
