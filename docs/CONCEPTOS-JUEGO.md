@@ -126,6 +126,11 @@ una tabla de **32 entradas**. En este core cada entrada son **5 bytes**:
 - **Prioridad:** si dos sprites se solapan, gana el de **menor índice** de OAM. Si un
   sprite debe tapar a otro, colócalo antes (índice menor).
 - **Transparencia:** el color 0 en un sprite es transparente (deja ver lo de detrás).
+- ⚠️ **No hay transparencia ENTRE sprites.** Donde el sprite de delante tiene un
+  píxel transparente se ve el **fondo**, nunca el sprite de detrás. El hardware no
+  compone dos capas de sprite: es como la NES. Por eso los personajes se diseñan como
+  **rejillas de 8×8 que no se pisan**, y las partes que "invaden" (un puño, un arma)
+  son celdas propias.
 - **8 sprites por línea:** si en una misma fila horizontal coinciden más de 8, el
   hardware dibuja los primeros y **descarta el resto** de esa línea (afecta al flag
   `OVERFLOW`).
@@ -293,7 +298,7 @@ variaciones sobre este esqueleto.
 | **Tile** | dibujo de 8×8 del fondo, guardado como patrón (2 planos, 4 colores) |
 | **Patrón** | el dibujo en sí (los bytes). El fondo tiene 256; los sprites, 64 (banco aparte) |
 | **Tilemap** | cuadrícula 64×32 que dice qué tile va en cada celda (más grande que la pantalla) |
-| **Atributo** | byte por celda: paleta, volteos, prioridad, sólido |
+| **Atributo** | byte por celda: paleta (0-3) y sólido |
 | **Sprite** | dibujo libre de 8×8 colocado en una posición X,Y (hasta 32, en la OAM) |
 | **OAM** | tabla de los 32 sprites: X, Y, TILE, FLAGS, COLL |
 | **`TILE` (del OAM)** | índice de **patrón de sprite** (0-63) — NO es un tile de fondo |

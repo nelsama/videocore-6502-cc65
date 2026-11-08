@@ -15,9 +15,10 @@ solo el registro de cambios.
 > [`07-MANUAL-PROGRAMACION.md`](07-MANUAL-PROGRAMACION.md). Al recompilar el core,
 > revisa esa versión antes de dar por buena esta de la librería.
 >
-> Última revisión frente al core: commits `f8e2069`, `b2aff50`, `182d505`, `c40db9c`,
-> `9d7b89f`, `cac7049`, `b545716`, `109fc5f`, `ac34350`, `0633341`, `bd5e160`,
-> `57774ed`. Sin cambios que rompan la API.
+> Última revisión frente al core: commits `0ae9253`, `7ac602f`, `f8e2069`, `b2aff50`,
+> `182d505`, `c40db9c`, `9d7b89f`, `cac7049`, `b545716`, `109fc5f`, `ac34350`,
+> `0633341`, `bd5e160`, `57774ed`. Sin cambios de registros ni de API: los últimos
+> commits son documentación de comportamiento.
 
 ### Corregido
 
@@ -44,6 +45,21 @@ solo el registro de cambios.
   completo de `STATUS`, usa `vc_status()`.
 
 ### Añadido
+
+### Corregido
+
+- **Corregidas dos imprecisiones sobre el atributo y los solapes de sprites**
+  (core `0ae9253`). La tabla de áreas decía que el atributo guarda "flips/PRIO" y
+  la de conceptos también; **esos bits no existen** en el fondo (solo paleta 1:0 y
+  sólido). Se documenta además que **no hay transparencia entre sprites**: donde el
+  de delante es transparente se ve el fondo, no el sprite de atrás.
+
+- **Documentado qué pasa al escribir fuera de VBLANK** (core `0ae9253`). La VRAM
+  **no se corrompe** (doble puerto): el efecto es *tearing*. La OAM tampoco es más
+  segura. Única excepción: durante init/SETUP las escrituras se ignoran.
+
+  ⚠️ **El emulador no reproduce el tearing** (renderiza por frame completo), así
+  que depurar ahí no valida las escrituras fuera de VBLANK.
 
 - **Los patrones de sprite 0-2 y los tiles de fondo 0-7 SÍ traen arte de demo**
   (core `f8e2069`). La revisión anterior del manual decía lo contrario (que

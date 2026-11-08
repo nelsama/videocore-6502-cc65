@@ -52,7 +52,7 @@ gestiona por ti (`vc_*`); solo necesitas conocerlas para **calcular presupuestos
 | Área | Tamaño | Qué guarda | Funciones típicas |
 |------|--------|-----------|-------------------|
 | **Tilemap** | 2048 celda(s) | qué tile va en cada celda del mundo 64×32 | `vc_put_cell` |
-| **Atributos** | 2048 celda(s) | paleta / flips / PRIO / sólido por celda | `vc_set_cell_attr` |
+| **Atributos** | 2048 celda(s) | paleta (0-3) y sólido por celda | `vc_set_cell_attr` |
 | **Patrones de fondo** | 256 patrones | los dibujos de los tiles (8×8, 2bpp) | `vc_load_bg_pattern` |
 | **OAM** | 160 B (32 sprites) | X / Y / TILE / FLAGS / COLL de cada sprite | `vc_sprite_set` |
 | **Patrones de sprite** | 64 patrones | los dibujos de los sprites (8×8, 2bpp) | `vc_load_spr_pattern` |
@@ -162,6 +162,34 @@ Funciones individuales (no usan el setup; control fino):
 > **Regla de oro:** mueve sprites, escribe OAM/VRAM y scroll **durante el
 > VBLANK**, o verás sprites "partidos" a mitad de frame. Dispara el setup de
 > VRAM en VBLANK para evitar el rasgado de ~1 frame mientras limpia.
+
+#### Por qué VBLANK (y qué NO pasa si te lo saltas)
+
+Es el malentendido más común, así que conviene ser exacto (manual del core §1.1):
+
+- **La VRAM no se corrompe.** Las escrituras del CPU y las lecturas del barrido van
+  por puertos distintos de la misma memoria de doble puerto. Un valor escrito
+  **nunca** se mezcla con otro ni queda a medias.
+- **Lo que sí ocurre es *tearing*** (desgarro): la parte ya dibujada muestra el
+  valor viejo y la que falta por dibujar el nuevo → un corte horizontal visible.
+- **La OAM tampoco es "más segura".** También se lee al vuelo, así que escribir un
+  sprite a mitad de frame lo deja **partido**.
+
+| Qué escribes | ¿Hace falta VBLANK? |
+|---|---|
+| Tilemap / patrones que cambian de golpe (cambio de pantalla) | SÍ, o se ve el corte |
+| Scroll, paletas, bandas | SÍ (se leen al inicio de frame) |
+| OAM (posición de sprites) | SÍ |
+| Rellenar la pantalla **antes** de mostrarla | No importa, nadie la ve aún |
+
+**Única excepción real:** mientras `init_done='0'` (arranque y durante un `SETUP`),
+las escrituras del CPU **se ignoran**. Por eso `vc_clear_vram()` espera a
+`VIDEO_READY` antes de devolver.
+
+> ⚠️ **El emulador no reproduce el tearing.** Renderiza por frame completo, así que
+> una escritura fuera de VBLANK se ve siempre "correcta" al depurar. No concluyas
+> que tu código está bien por eso: el sprite partido o el corte horizontal solo
+> aparecen en el hardware real.
 
 ### Escritura a VRAM (puerto indirecto)
 

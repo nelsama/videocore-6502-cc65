@@ -95,6 +95,9 @@ Destilado de cinco juegos reales ya funcionando en este hardware:
 - Coordenada **X de 9 bits (0-511)**; la biblioteca gestiona el bit 8.
 - `Y ≥ 248` **deshabilita** el sprite.
 - Prioridad: **gana el sprite de menor índice** de OAM.
+- ⚠️ **No hay transparencia ENTRE sprites.** Donde el de delante es transparente se
+  ve el **fondo**, no el sprite de detrás. Diseña los personajes como **rejillas de
+  8×8 que no se pisan**; las partes que invaden (un puño, un arma) son celdas propias.
 - **Flip**: `VC_SPR_FLIP_X` / `VC_SPR_FLIP_Y` funcionan de forma **fiable**.
   (En tiles de fondo el flip **no** es fiable.)
 
