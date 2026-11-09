@@ -1,10 +1,18 @@
 /**
  * ============================================================================
- * gfx.c - Capa de alto nivel de la biblioteca del Core de Vídeo
+ * gfx.c - Capa de alto nivel de la biblioteca del Core de Video
  * ============================================================================
- * Wrappers cómodos sobre el núcleo en ensamblador (video.s). Aquí viven las
- * funciones pensadas para el código de juego: sprites, objetos 16x16, texto,
- * colisiones por software y utilidades de fondo.
+ * Wrappers comodos sobre el nucleo en ensamblador (video.s). Aqui viven los
+ * sprites, las colisiones por software y las paletas.
+ *
+ * El resto de la capa alta se ha separado en modulos para que el linker pueda
+ * DESCARTAR lo que un juego no use (el descarte de cc65 es por archivo .o, no
+ * por funcion):
+ *   - gfx_vram.c   limpieza de VRAM, color de la fuente, vc_cell()
+ *   - gfx_tiles.c  atributos de celda y carga de tiles
+ *   - gfx_text.c   modo texto
+ *
+ * La API completa sigue en video.h: para el usuario no cambia nada.
  *
  * Toda escritura a VRAM/OAM debe hacerse en VBLANK para evitar "partir"
  * sprites o tiles a mitad de frame.
@@ -14,77 +22,12 @@
 #include "video.h"
 
 /* ===========================================================================
- * LIMPIEZA DE VRAM
- * =========================================================================== */
-
-/* Limpia la VRAM usando el SETUP POR HARDWARE del core ($D816/$D817).
- *
- * El core limpia en hardware, en ~120-275 us:
- *   - tilemap completo (2048 celdas -> tile 0)
- *   - atributos a 0
- *   - patrones de fondo y de sprite escribibles
- *   - RE-EXPANDE la fuente de texto (glifos $20-$7F desde la ROM de fuente)
- *
- * Por eso, a diferencia de la version manual antigua, este clear SI reescribe
- * los patrones: los borra y vuelve a cargar la fuente, de modo que el texto
- * sigue disponible despues de limpiar. Si el juego habia dibujado sus propios
- * tiles en el rango de la fuente ($20-$7F), SE PERDERAN.
- *
- * El tile 0 queda apuntando a un patron en blanco (transparente), asi que la
- * pantalla se ve del color de fondo (BG_COLOR).
- *
- * OJO: mientras el setup corre (BUSY=1), las escrituras del CPU a VRAM/OAM se
- * IGNORAN. Por eso esta funcion ESPERA a que termine antes de retornar, para
- * que puedas escribir tu mundo justo despues. No toca paletas, scroll ni
- * bandas.
- *
- * El OAM (posiciones de sprite) NO lo limpia el setup; vc_clear_vram() deshabilita
- * los 32 sprites a continuacion, para que no queden dibujando tras borrar sus
- * patrones.
- *
- * Debe llamarse tras vc_wait_ready() y dentro del VBLANK (evita rasgado). */
-void vc_clear_vram(void) {
-    VID_SETUP = 1;      /* dispara el setup por hardware */
-    vc_wait_setup();    /* espera a BUSY=0 -> la VRAM ya esta lista */
-    vc_clear_oam();     /* deshabilita los 32 sprites */
-}
-
-/* Color del trazo de la fuente ($D818).
- *
- * Los patrones de la fuente se expanden UNA vez (en el setup) usando una sola
- * entrada de paleta para el trazo; este registro elige cuál (0-3). Por eso:
- *   - 0 deja el texto invisible (el color 0 del fondo es transparente);
- *   - 3 es el valor de arranque y el que usan los juegos existentes;
- *   - cambiarlo NO repinta: hace falta el setup, que además limpia el tilemap.
- *
- * Aqui solo se escribe el registro; el repintado lo decide quien llama. */
-void vc_set_font_color(uint8_t color) {
-    VID_FONT_COLOR = (uint8_t)(color & 0x03);
-}
-
-/* ===========================================================================
- * ATRIBUTOS DEL FONDO
- * =========================================================================== */
-
-/* Escribe el atributo de una celda = paleta + flags (VC_ATTR_*). */
-void vc_set_cell_attr(uint8_t col, uint8_t row, uint8_t paleta, uint8_t flags) {
-    vc_put_attr(col, row, (uint8_t)((flags & 0xF0) | (paleta & 0x0F)));
-}
-
-/* Deja la celda vacía: tile 0 y atributo 0. */
-void vc_free_cell(uint8_t col, uint8_t row) {
-    vc_put_cell(col, row, 0);
-    vc_put_attr(col, row, 0);
-}
-
-/* ===========================================================================
  * SPRITES
  * ===========================================================================
- * vc_sprite_set() y vc_sprite_move() viven en el núcleo en ensamblador
- * (src/video.s) por rendimiento; sus prototipos están en video.h.
+ * vc_sprite_set() y vc_sprite_move() viven en el nucleo en ensamblador
+ * (src/video.s) por rendimiento; sus prototipos estan en video.h.
  * ========================================================================= */
 
-/* Deshabilita un sprite (Y fuera de rango). */
 /* Deshabilita un sprite: deja de dibujarse Y deja de colisionar.
  *
  * Poner Y >= 248 solo desactiva el DIBUJADO. El barrido de colision del
@@ -114,40 +57,42 @@ void vc_sprite_disable(uint8_t spr) {
 }
 
 /*
- * vc_sprite16_set() vive en el núcleo en ensamblador (src/video.s) por
+ * vc_sprite16_set() vive en el nucleo en ensamblador (src/video.s) por
  * rendimiento. Compone un objeto 16x16 con 4 sprites consecutivos:
  *   cuadrante 0 = (x,   y)      tile0+0
  *   cuadrante 1 = (x+8, y)      tile0+1
  *   cuadrante 2 = (x,   y+8)    tile0+2
  *   cuadrante 3 = (x+8, y+8)    tile0+3
+ * OJO: fija COLL = centro ($24) en los 4 cuadrantes.
  * (ver prototipo en video.h)
  */
 
 /* ===========================================================================
- * COLISIÓN
+ * COLISION
  * =========================================================================== */
 
-/* Flag global de colisión sprite↔tile sólido de este frame.
+/* Flag global de colision sprite<->tile solido de este frame.
  *
- * Devuelve 0 o 1 (no la máscara 0x20): el bit vive en $D803, pero exponerlo
- * así evita el error clásico de comparar con `== 1` y no saber por qué nunca
- * entra. Si necesitas el byte completo de STATUS, usa vc_status(). */
+ * Devuelve 0 o 1 (no la mascara 0x20): el bit vive en $D803, pero exponerlo
+ * asi evita el error clasico de comparar con `== 1` y no saber por que nunca
+ * entra. Si necesitas el byte completo de STATUS, usa vc_status().
+ *
+ * Llega con 1 frame de latencia: refleja el VBLANK anterior. */
 uint8_t vc_solid_hit(void) {
     return (uint8_t)((vc_status() & VC_STATUS_SOLID_HIT) ? 1 : 0);
 }
 
-/* Detección AABB genérica (sprite↔sprite, en software). */
-
 /* ===========================================================================
- * COLISIÓN AABB — núcleo en ensamblador (src/collide.s)
+ * COLISION AABB - nucleo en ensamblador (src/collide.s)
  * ===========================================================================
- * Los wrappers cargan la Zero Page del módulo (CL_*) y llaman al núcleo asm,
- * que evita el coste del stack de cc65 (mucho más rápido que C puro).
- * ========================================================================= */
-
-/* Zero Page del módulo de colisiones (definida en collide.s). Se declaran
- * extern y se marcan como zero page con #pragma zpsym para que cc65 use
- * direccionamiento de página cero. */
+ * Los wrappers cargan la Zero Page del modulo (CL_*) y llaman al nucleo asm,
+ * que evita el coste del stack de cc65. Se declaran extern y se marcan como
+ * zero page con #pragma zpsym para que cc65 use direccionamiento de pagina
+ * cero.
+ *
+ * OJO al dividir este archivo: estas declaraciones deben estar en UN SOLO
+ * modulo .c. Si se declaran tambien en otro, el linker falla por simbolos
+ * duplicados. */
 extern uint16_t CL_AX, CL_AY, CL_AW, CL_AH;
 extern uint16_t CL_BX, CL_BY, CL_BW, CL_BH;
 #pragma zpsym("CL_AX")
@@ -158,10 +103,11 @@ extern uint16_t CL_BX, CL_BY, CL_BW, CL_BH;
 #pragma zpsym("CL_BY")
 #pragma zpsym("CL_BW")
 #pragma zpsym("CL_BH")
+
 extern uint8_t  cl_overlap(void);
 extern uint8_t  cl_point(void);
 
-/* 1 = la caja A solapa con la caja B. */
+/* 1 = las cajas A y B se solapan. */
 uint8_t vc_box_overlap(const vc_box_t *a, const vc_box_t *b) {
     CL_AX = a->x; CL_AY = a->y; CL_AW = a->w; CL_AH = a->h;
     CL_BX = b->x; CL_BY = b->y; CL_BW = b->w; CL_BH = b->h;
@@ -170,133 +116,15 @@ uint8_t vc_box_overlap(const vc_box_t *a, const vc_box_t *b) {
 
 /* 1 = el punto (px,py) cae dentro de la caja b. */
 uint8_t vc_box_contains(const vc_box_t *b, uint16_t px, uint16_t py) {
-    CL_AX = px; CL_AY = py;                 /* el punto va en la "caja A" */
+    CL_AX = px; CL_AY = py; CL_AW = 0; CL_AH = 0;
     CL_BX = b->x; CL_BY = b->y; CL_BW = b->w; CL_BH = b->h;
     return cl_point();
 }
 
-/* Construye una caja cuadrada desde un sprite en (x,y) de tamaño `size` (8/16/32). */
+/* Construye una caja desde un sprite de size x size en (x,y). */
 void vc_box_from_sprite(vc_box_t *box, uint16_t x, uint16_t y, uint8_t size) {
     box->x = x;
     box->y = y;
     box->w = size;
     box->h = size;
-}
-
-/* ===========================================================================
- * TEXTO
- * =========================================================================== */
-
-/* Limpia la pantalla visible (40x30) con espacios. La fila 0 se reserva por
- * el desfase del pipeline; se rellena también para mayor comodidad. */
-void vc_text_init(void) {
-    uint8_t col, row;
-
-    for (row = 0; row < VC_SCREEN_ROWS; row++) {
-        for (col = 0; col < VC_SCREEN_COLS; col++) {
-            vc_put_cell(col, row, VC_CHAR_SPACE);      /* espacio */
-        }
-    }
-}
-
-/* Escribe un carácter en la posición (col,row). El tile es el propio ASCII. */
-void vc_put_char(uint8_t col, uint8_t row, char c) {
-    vc_put_cell(col, row, (uint8_t)c);
-}
-
-/* Escribe una cadena desde (col,row); se detiene en el terminador 0.
- * Usa la paleta de texto por defecto (paleta 0). */
-void vc_put_str(uint8_t col, uint8_t row, const char *s) {
-    while (*s) {
-        vc_put_cell(col, row, (uint8_t)*s);
-        col++;
-        if (col >= VC_SCREEN_COLS) {
-            col = 0;
-            row++;
-        }
-        s++;
-    }
-}
-
-/* Igual que vc_put_str pero fija la paleta del texto en cada celda. */
-void vc_put_str_pal(uint8_t col, uint8_t row, const char *s, uint8_t paleta) {
-    while (*s) {
-        vc_put_cell(col, row, (uint8_t)*s);
-        vc_set_cell_attr(col, row, paleta, 0);
-        col++;
-        if (col >= VC_SCREEN_COLS) {
-            col = 0;
-            row++;
-        }
-        s++;
-    }
-}
-
-/* ===========================================================================
- * FONDO: CARGAR TILESET Y MAPA COMPLETO
- * =========================================================================== */
-
-/*
- * Carga N patrones de fondo consecutivos desde dos tablas planares.
- * pat0[i*8+fila] = plano 0 del patrón (tile_base+i)
- * pat1[i*8+fila] = plano 1 del patrón (tile_base+i)
- */
-void vc_load_tiles(uint8_t tile_base, uint8_t count,
-                   const uint8_t *pat0, const uint8_t *pat1) {
-    uint8_t i;
-
-    for (i = 0; i < count; i++) {
-        vc_load_bg_pattern((uint8_t)(tile_base + i), pat0, pat1);
-        pat0 += VC_TILE_SIZE;
-        pat1 += VC_TILE_SIZE;
-    }
-}
-
-/* Copia un bloque del tilemap visible a VRAM, fila a fila.
- * src debe contener 40*30 = 1200 bytes (formato de pantalla, no de mapa 64). */
-void vc_blit_screen(const uint8_t *src) {
-    uint8_t col, row;
-
-    for (row = 0; row < VC_SCREEN_ROWS; row++) {
-        for (col = 0; col < VC_SCREEN_COLS; col++) {
-            vc_put_cell(col, row, *src++);
-        }
-    }
-}
-
-/* ===========================================================================
- * PALETAS PROGRAMABLES
- * ===========================================================================
- * El hardware permite reescribir las entradas de paleta en cualquier momento
- * (RGB444, $D813-$D815). Al arrancar valen los valores por defecto del manual.
- * ESCRIBIR EN VBLANK si cambias muchos colores a la vez.
- */
-
-/* Fija UN color de la paleta de FONDO (paleta 0-3, color 0-3). */
-void vc_pal_set_bg(uint8_t paleta, uint8_t color, uint16_t rgb444) {
-    vc_pal_set(VC_PAL_BG(paleta, color), rgb444);
-}
-
-/* Fija UN color de la paleta de SPRITE (paleta 0-3, color 0-3). */
-void vc_pal_set_spr(uint8_t paleta, uint8_t color, uint16_t rgb444) {
-    vc_pal_set(VC_PAL_SPR(paleta, color), rgb444);
-}
-
-/* Carga los 4 colores de una paleta de FONDO desde un array RGB444[4]. */
-void vc_pal_load_bg(uint8_t paleta, const uint16_t *colores4) {
-    vc_pal_load(VC_PAL_BG(paleta, 0), colores4, 4);
-}
-
-/* Carga los 4 colores de una paleta de SPRITE desde un array RGB444[4]. */
-void vc_pal_load_spr(uint8_t paleta, const uint16_t *colores4) {
-    vc_pal_load(VC_PAL_SPR(paleta, 0), colores4, 4);
-}
-
-/* Fija el color de fondo global (BG_COLOR) con un RGB444.
- *
- * BG_COLOR es la entrada 15 del banco de fondo (= paleta 3, color 3); no hay
- * registro propio. Afecta al margen de la pantalla y al fondo vacio (color 0
- * del fondo). Escribelo en VBLANK para evitar una franja con el color viejo. */
-void vc_set_bgcolor(uint16_t rgb444) {
-    vc_pal_set(VC_PAL_BGCOLOR, rgb444);
 }

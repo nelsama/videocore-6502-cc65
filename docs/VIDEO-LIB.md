@@ -18,7 +18,11 @@ split de raster, modo texto, colisión sprite↔tile y paletas programables.
 | `src/video.h` | API pública: registros, constantes y prototipos |
 | `src/video.s` | Núcleo en ensamblador: puerto indirecto, VBLANK, volcados masivos |
 | `src/collide.s` | Núcleo en ensamblador: colisiones AABB |
-| `src/gfx.c` | Alto nivel en C: texto, helpers de fondo y utilidades |
+| `src/gfx.c` | Alto nivel en C: sprites, cajas AABB, paletas |
+| `src/gfx_vram.c` | `vc_clear_vram`, `vc_set_font_color`, `vc_cell` |
+| `src/gfx_tiles.c` | Atributos de celda y carga de tiles |
+| `src/gfx_text.c` | Modo texto |
+| `src/gfx_pal.c` | Paletas programables |
 | `output/vc.lib` | Biblioteca estática reutilizable (video.o + collide.o + gfx.o) |
 
 ## Compilación
@@ -729,10 +733,13 @@ orienta a quien busque el código de cada función:
 | `vc_set_scroll_*`, `vc_set_raster`, `vc_set_band*` | `video.s` | Escritura de registros |
 | `vc_pal_ptr`, `vc_pal_set`, `vc_pal_load` | `video.s` | Registros de paleta (bajo nivel) |
 | `vc_box_overlap`, `vc_box_contains` | `collide.s` + `gfx.c` | Núcleo AABB en asm; wrapper C |
-| `vc_clear_vram`, `vc_text_init`, `vc_put_char`, `vc_put_str(_pal)` | `gfx.c` | No crítico, más legible en C |
-| `vc_set_cell_attr`, `vc_free_cell`, `vc_sprite_disable` | `gfx.c` | Helpers triviales |
-| `vc_pal_set_bg/spr`, `vc_pal_load_bg/spr` | `gfx.c` | Helpers de paleta por (pal,color) |
-| `vc_solid_hit`, `vc_box_from_sprite`, `vc_load_tiles`, `vc_blit_screen` | `gfx.c` | Orquestación |
+| `vc_clear_vram` | `gfx_vram.c` | Setup por hardware, poco frecuente |
+| `vc_text_init`, `vc_put_char`, `vc_put_str(_pal)` | `gfx_text.c` | No crítico, más legible en C |
+| `vc_set_cell_attr`, `vc_free_cell` | `gfx_tiles.c` | Helpers triviales |
+| `vc_sprite_disable` | `gfx.c` | Helper trivial |
+| `vc_pal_set_bg/spr`, `vc_pal_load_bg/spr` | `gfx_pal.c` | Helpers de paleta por (pal,color) |
+| `vc_solid_hit`, `vc_box_from_sprite` | `gfx.c` | Orquestación |
+| `vc_load_tiles`, `vc_blit_screen` | `gfx_tiles.c` | Orquestación |
 
 > `vc_clear_vram()` dispara el **setup de VRAM por hardware** (`$D816`) y espera a
 > que termine; el trabajo pesado lo hace el core, no el CPU.
@@ -749,7 +756,8 @@ Las rutinas sensibles al rendimiento viven en ensamblador:
   `vc_sprite16_set`, `vc_oam_put`).
 - **`collide.s`**: núcleo AABB de colisiones (`cl_overlap`, `cl_point`).
 
-`gfx.c` conserva lo que no es crítico (texto, helpers, `vc_clear_vram`, etc.).
+Los módulos `gfx*.c` conservan lo que no es crítico. Están separados para que
+el linker descarte los que un juego no use (ver *Coste de tamaño*).
 
 Notas:
 
@@ -825,25 +833,36 @@ escribiendo el sprite en vez del dato) están documentadas en
 
 ### Coste de tamaño
 
-| Módulo | Código | Zero Page |
-|--------|--------|-----------|
-| `video.o` | 1050 B (núcleo asm: VRAM, sprites, paletas, scroll) | 20 B |
-| `gfx.o` | 1006 B (alto nivel C) | — |
-| `collide.o` | 170 B (colisiones AABB asm) | 18 B |
-| **Total biblioteca** | **2226 B (~2.17 KB)** | **38 B** |
+La capa de alto nivel está **dividida en módulos `.o`** para que el linker
+**descarte lo que un juego no use** (cc65 descarta por archivo, no por función):
 
-Binarios de ejemplo: **2632 B** uno mínimo, ~3.9–5.9 KB los de `examples/` (con
-`startup.s`, `main` y el runtime de cc65).
+| Módulo | Código | Qué contiene |
+|--------|--------|--------------|
+| `video.o` | 1050 B | núcleo asm: VRAM, sprites, paletas, scroll |
+| `gfx.o` | 360 B | sprites (`vc_sprite_disable`), cajas AABB, `vc_solid_hit` |
+| `gfx_text.o` | 263 B | modo texto |
+| `gfx_tiles.o` | 234 B | atributos de celda, carga de tiles |
+| `collide.o` | 170 B | AABB en asm |
+| `gfx_pal.o` | 145 B | paletas programables |
+| `gfx_vram.o` | 58 B | `vc_clear_vram`, `vc_set_font_color`, `vc_cell` |
+| **Total** | **2280 B** | 38 B de Zero Page |
 
-De la biblioteca se **enlaza solo lo que uses** (es un `.lib`; el linker descarta lo
-no referenciado). El archivo `vc.lib` en disco es mayor (~25 KB) porque incluye la
-tabla de símbolos, que no va al binario final.
+Un juego que no use texto ni tilemaps se ahorra **~500 B** frente a tenerlo todo
+en un módulo. Medido: `examples/palette` bajó de 4240 a **3807 B** (−433 B) al
+descartar `gfx.o` entero.
 
-> ⚠️ **El descarte es por módulo `.o`, no por función.** `gfx.c` es un único objeto,
-> así que usar **una** de sus funciones (p. ej. `vc_put_str_pal`) arrastra las 1006 B
-> completas. `video.o` y `collide.o` también entran enteros. Si el espacio llega a
-> apretar, dividir `gfx.c` en varios `.o` (sprites, texto, cajas, paletas) permitiría
-> descartar lo no usado; está anotado en el [`CHANGELOG`](CHANGELOG.md).
+Binarios de ejemplo: **2632 B** uno mínimo, 3807–6031 B los de `examples/`.
+
+> ⚠️ **El descarte es por módulo `.o`, no por función.** Usar **una** función de
+> `gfx_text.o` arrastra las 263 B completas. Por eso los módulos agrupan
+> funciones que se usan juntas.
+
+> Las **dependencias entre módulos** están cortadas a propósito: `gfx_text.c`
+> llama a `vc_put_attr` (asm) en vez de `vc_set_cell_attr`, para no arrastrar
+> `gfx_tiles.o` solo por escribir texto con color.
+
+El archivo `vc.lib` en disco es mayor (~29 KB) porque incluye la tabla de
+símbolos, que no va al binario final.
 
 ---
 
@@ -897,12 +916,26 @@ VC_NUM_SPRITES (32)  VC_TILE_BLANK (0)  VC_CHAR_SPACE (0x20)
 /* Filas seguras para contenido: 1..28 (ver overscan) */
 
 /* Macros útiles */
-VC_CELL(col, row)          // celda del tilemap = row*64 + col
+VC_CELL(col, row)          /* celda = row*64 + col. Se pliega con constantes */
+vc_cell(col, row)          /* version FUNCION: 1 copia del producto, para variables */
 VC_BG_PAT_ADDR(tile, fila) // dirección de patrón de fondo: tile*8 + fila
 VC_SPR_PAT_ADDR(patron, fila) // dirección de patrón de sprite: patron*8 + fila
 VC_OAM_ADDR(spr, field)    // byte del OAM: spr*5 + field
 VC_WRITE(area, addr, data)
 ```
+
+> **`VC_CELL` frente a `vc_cell()`.** La macro repite el producto en **cada** uso
+> (~45 B con argumentos variables), pero se pliega a cero si son constantes. La
+> función paga 32 B una vez y cada uso es un `jsr`. Regla:
+>
+> | Situación | Usar |
+> |---|---|
+> | Ambos argumentos constantes | `VC_CELL` (coste 0) |
+> | Columna constante | `VC_CELL` (cc65 la reduce a `incaxN`) |
+> | Bucle sobre una fila | `VC_CELL` una vez + incrementar |
+> | Llamadas sueltas con variables | `vc_cell()` |
+>
+> La misma dirección sirve para tilemap y atributos (solo cambia el área).
 
 ---
 

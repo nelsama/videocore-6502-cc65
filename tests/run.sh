@@ -55,14 +55,20 @@ run "carga de patron de sprite" build/test_sprload.prg
 "$CL65" -t sim6502 -o build/test_pal.prg tests/pal_test.s build/video_sim.o
 run "paletas programables" build/test_pal.prg
 
-# --- gfx.c (necesita video.s con TEST_HOOKS y collide.s) ---
+# --- gfx.c y sus modulos (necesita video.s con TEST_HOOKS y collide.s) ---
 "$CL65" -t sim6502 -O -I src -D TEST_HOOKS -c -o build/gfx_sim.o src/gfx.c
+"$CL65" -t sim6502 -O -I src -D TEST_HOOKS -c -o build/gfx_vram_sim.o src/gfx_vram.c
+"$CL65" -t sim6502 -O -I src -D TEST_HOOKS -c -o build/gfx_tiles_sim.o src/gfx_tiles.c
+"$CL65" -t sim6502 -O -I src -D TEST_HOOKS -c -o build/gfx_text_sim.o src/gfx_text.c
+"$CL65" -t sim6502 -O -I src -D TEST_HOOKS -c -o build/gfx_pal_sim.o src/gfx_pal.c
+GFX_SIM="build/gfx_sim.o build/gfx_vram_sim.o build/gfx_tiles_sim.o build/gfx_text_sim.o build/gfx_pal_sim.o"
+
 "$CL65" -t sim6502 -o build/test_disable.prg tests/disable_test.s \
-    build/video_sim.o build/gfx_sim.o build/collide_sim.o
+    build/video_sim.o build/collide_sim.o $GFX_SIM
 run "sprite_disable apaga todo" build/test_disable.prg
 
 "$CL65" -t sim6502 -o build/test_fontcolor.prg tests/fontcolor_test.s \
-    build/video_sim.o build/gfx_sim.o build/collide_sim.o
+    build/video_sim.o build/collide_sim.o $GFX_SIM
 run "color de la fuente" build/test_fontcolor.prg
 
 echo "======================================="

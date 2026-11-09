@@ -27,8 +27,12 @@ OUTPUT_DIR  = output
 
 LIB = $(OUTPUT_DIR)/vc.lib
 LIB_ASM     = $(SRC_DIR)/video.s $(SRC_DIR)/collide.s
-LIB_C       = $(SRC_DIR)/gfx.c
-LIB_OBJECTS = $(BUILD_DIR)/video.o $(BUILD_DIR)/collide.o $(BUILD_DIR)/gfx.o
+LIB_C       = $(SRC_DIR)/gfx.c $(SRC_DIR)/gfx_vram.c $(SRC_DIR)/gfx_tiles.c \
+              $(SRC_DIR)/gfx_text.c $(SRC_DIR)/gfx_pal.c
+LIB_OBJECTS = $(BUILD_DIR)/video.o $(BUILD_DIR)/collide.o \
+              $(BUILD_DIR)/gfx.o $(BUILD_DIR)/gfx_vram.o \
+              $(BUILD_DIR)/gfx_tiles.o $(BUILD_DIR)/gfx_text.o \
+              $(BUILD_DIR)/gfx_pal.o
 
 CFLAGS  = -t none -O --cpu 6502 -I $(SRC_DIR) -I $(INCLUDE_DIR)
 ASFLAGS = -t none --cpu 6502
@@ -53,9 +57,22 @@ $(BUILD_DIR)/collide.o: $(SRC_DIR)/collide.s
 	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(BUILD_DIR)/gfx.o: $(LIB_C) $(SRC_DIR)/video.h
+	$(CC) -c $(CFLAGS) -o $@ $(SRC_DIR)/gfx.c
+
+$(BUILD_DIR)/gfx_vram.o: $(SRC_DIR)/gfx_vram.c $(SRC_DIR)/video.h
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+$(BUILD_DIR)/gfx_tiles.o: $(SRC_DIR)/gfx_tiles.c $(SRC_DIR)/video.h
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+$(BUILD_DIR)/gfx_text.o: $(SRC_DIR)/gfx_text.c $(SRC_DIR)/video.h
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+$(BUILD_DIR)/gfx_pal.o: $(SRC_DIR)/gfx_pal.c $(SRC_DIR)/video.h
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 $(LIB): $(LIB_OBJECTS)
+	@rm -f $@
 	$(AR) a $@ $(LIB_OBJECTS)
 
 # ============================================================================

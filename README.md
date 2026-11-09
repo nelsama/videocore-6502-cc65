@@ -21,7 +21,11 @@ lo refleja y encapsula; no se necesita conocer el VHDL.
 │   ├── video.h         # API pública: registros, constantes y prototipos
 │   ├── video.s         # Núcleo en ensamblador (puerto indirecto, VBLANK, sprites)
 │   ├── collide.s       # Núcleo de colisiones AABB en ensamblador
-│   └── gfx.c           # Alto nivel en C (texto, helpers de fondo, utilidades)
+│   ├── gfx.c           # Alto nivel: sprites, cajas AABB, colisión
+│   ├── gfx_vram.c      # vc_clear_vram, vc_set_font_color, vc_cell
+│   ├── gfx_tiles.c     # Atributos de celda y carga de tiles
+│   ├── gfx_text.c      # Modo texto
+│   └── gfx_pal.c       # Paletas programables
 ├── config/
 │   └── programa.cfg    # Configuración del linker
 ├── docs/

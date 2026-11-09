@@ -46,6 +46,37 @@ solo el registro de cambios.
 
 ### Añadido
 
+- **`vc_cell(col, row)` — versión FUNCIÓN de `VC_CELL`.** La macro repite el
+  producto en **cada** uso con argumentos variables (~45 B por uso, medido); la
+  función lo tiene una vez (32 B) y cada uso es un `jsr`. Con 8 usos el ahorro
+  medido es de **~144 B**. La macro se conserva: gana con argumentos constantes
+  (se pliega a 0), con columna constante y en bucles.
+
+  Ojo: `(row << 6) | col` y `row * 64 + col` generan **el mismo código**; cc65 ya
+  usa shifts, así que reescribirlo no ahorra nada.
+
+### Cambiado
+
+- **La capa de alto nivel se divide en módulos `.o`** para que el linker descarte
+  lo que un juego no use (cc65 descarta por archivo, no por función). `gfx.c`
+  pasa a ser 5 ficheros:
+
+  | Módulo | Código |
+  |---|---|
+  | `gfx.o` (sprites, cajas, colisión) | 360 B |
+  | `gfx_text.o` | 263 B |
+  | `gfx_tiles.o` | 234 B |
+  | `gfx_pal.o` | 145 B |
+  | `gfx_vram.o` | 58 B |
+
+  **La API no cambia**: mismas firmas, mismo `video.h`. Medido: `examples/palette`
+  bajó de 4240 a **3807 B** (−433 B) al poder descartar `gfx.o`.
+
+  `gfx_text.c` llama a `vc_put_attr` (asm) en vez de `vc_set_cell_attr` para no
+  arrastrar `gfx_tiles.o` solo por escribir texto con color.
+
+  **Los juegos no se ven afectados:** cada uno enlaza su copia en `lib/vc.lib`.
+
 ### Corregido
 
 - **Corregidas dos imprecisiones sobre el atributo y los solapes de sprites**

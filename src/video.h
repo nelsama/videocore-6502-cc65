@@ -297,6 +297,21 @@ uint8_t  vc_status(void);           /* lee STATUS ($D803)                    */
  * fuente (~120-275 us). vc_clear_vram() lo usa internamente. */
 void     vc_wait_setup(void);       /* espera a que el setup termine         */
 
+/* --- Direccion lineal de una celda del tilemap: row*64 + col ---
+ *
+ * Version FUNCION de la macro VC_CELL. Cuesta 32 B en la libreria, pero con 8
+ * usos de argumentos variables ahorra ~144 B en el binario del juego (la macro
+ * repite el producto en CADA uso).
+ *
+ * Cuando usar cada una:
+ *   - ambos argumentos constantes      -> VC_CELL   (se pliega, 0 coste)
+ *   - columna constante                -> VC_CELL   (cc65 la reduce a incaxN)
+ *   - bucle sobre una fila o columna   -> VC_CELL una vez + ir incrementando
+ *   - llamadas sueltas con variables   -> vc_cell()
+ *
+ * Sirve para la MISMA direccion en tilemap y atributos (solo cambia el area). */
+uint16_t vc_cell(uint8_t col, uint8_t row);
+
 /* --- Color de la fuente ($D818) ---
  * Elige qué entrada de paleta (0-3) usa el TRAZO de la fuente. Es GLOBAL: un
  * solo valor para todo el texto, y por defecto 3 (blanco en las paletas 0-1).
