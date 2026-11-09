@@ -123,6 +123,15 @@ MiJuego/
 └── output/game.bin     binario final
 ```
 
+> **Al actualizar la biblioteca**, copia a la vez `lib/vc.lib` **y**
+> `include/video.h` (`config/programa.cfg` solo si cambia el mapa de memoria). Si
+> copias uno sin el otro, el binario enlaza contra firmas viejas y falla al
+> compilar o, peor, escribe en el registro equivocado.
+>
+> Desde que `gfx.c` está dividido en módulos, actualizar la `vc.lib` puede
+> **reducir** el tamaño del juego (~400-500 B si no usa texto ni tilemaps): el
+> linker descarta los módulos que no referencies.
+
 ## 2.2 Makefile mínimo
 
 ```make
@@ -720,6 +729,10 @@ VC_RGB444(r,g,b);   VC_RGB888(0xRRGGBB);
 /* Texto */
 vc_text_init();
 vc_put_char(col,row,c);  vc_put_str(col,row,s);  vc_put_str_pal(col,row,s,pal);
+
+/* Dirección de celda: macro si los argumentos son constantes, función si no */
+VC_CELL(col,row)   /* se pliega con constantes; una vez por bucle */
+vc_cell(col,row)   /* para llamadas sueltas con variables (~45 B menos por uso) */
 vc_set_font_color(0-3);   /* color GLOBAL del trazo: exige SETUP + redibujar */
 
 /* Sin scroll: */

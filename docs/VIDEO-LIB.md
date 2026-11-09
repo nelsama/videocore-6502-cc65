@@ -18,12 +18,12 @@ split de raster, modo texto, colisión sprite↔tile y paletas programables.
 | `src/video.h` | API pública: registros, constantes y prototipos |
 | `src/video.s` | Núcleo en ensamblador: puerto indirecto, VBLANK, volcados masivos |
 | `src/collide.s` | Núcleo en ensamblador: colisiones AABB |
-| `src/gfx.c` | Alto nivel en C: sprites, cajas AABB, paletas |
+| `src/gfx.c` | Alto nivel en C: sprites, cajas AABB, `vc_solid_hit` |
 | `src/gfx_vram.c` | `vc_clear_vram`, `vc_set_font_color`, `vc_cell` |
 | `src/gfx_tiles.c` | Atributos de celda y carga de tiles |
 | `src/gfx_text.c` | Modo texto |
 | `src/gfx_pal.c` | Paletas programables |
-| `output/vc.lib` | Biblioteca estática reutilizable (video.o + collide.o + gfx.o) |
+| `output/vc.lib` | Biblioteca estática reutilizable (`video.o`, `collide.o` y los `gfx*.o`) |
 
 ## Compilación
 
